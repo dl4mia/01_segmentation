@@ -1,8 +1,8 @@
-# Exercise 5: Semantic Segmentation
+# Exercises 1-3: U-Net, Instance Segmentation, and Semantic Segmentation
 
 ## Setup
 
-Please run the setup script to create the environment for this exercise and download data.
+Please run the setup script to create the environment for these exercises and download data.
 
 ```bash
 source setup.sh
