@@ -1,3 +1,4 @@
+black
 pytorch==2.2
 torchvision
 jupyter 
