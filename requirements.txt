@@ -1,4 +1,5 @@
 black
+gdown
 pytorch==2.2
 torchvision
 jupyter 
