@@ -223,13 +223,15 @@ class CropAndConcat(torch.nn.Module):
 class UNet(torch.nn.Module):
     def __init__(
         self,
+        depth,
         in_channels,
         num_fmaps,
-        depth,
         fmap_inc_factor,
         downsample_factor,
         kernel_size=3,
         padding="VALID",
+        upsample_mode="nearest",
+        final_activation=None,
         out_channels=1,
     ):
         """Create a U-Net::
@@ -245,9 +247,11 @@ class UNet(torch.nn.Module):
         respectively.
         The U-Net expects 2D tensors shaped like::
             ``(batch=1, channels, height, width)``.
-        This U-Net performs only "valid" convolutions, i.e., sizes of the
-        feature maps decrease after each convolution.
         Args:
+            depth:
+                The number of levels in the UNet. 2 is the smallest that really
+                makes sense for the UNet architecture, as a one layer UNet is
+                basically just 2 conv blocks.
             in_channels:
                 The number of input channels.
             num_fmaps:
@@ -266,114 +270,85 @@ class UNet(torch.nn.Module):
                 Defaults to 3.
             padding (optional):
                 How to pad convolutions. Either 'same' or 'valid' (default).
+            final_activation (optional):
+                What activation to use in your final output block. Depends on your task.
+                Defaults to sigmoid
             out_channels (optional):
-                How many output channels you want. Depends on your task.
+                How many output channels you want. Depends on your task. Defaults to 1.
         """
 
         super(UNet, self).__init__()
 
         self.depth = depth
         self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size_down = kernel_size_down
-        self.kernel_size_up = kernel_size_up
+        self.num_fmaps = num_fmaps
+        self.fmap_inc_factor = fmap_inc_factor
         self.downsample_factor = downsample_factor
-
-        # modules
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.padding = padding
+        self.final_activation = final_activate
+        self.out_channels = out_channels
 
         # left convolutional passes
-        self.l_conv = nn.ModuleList(
-            [
-                ConvPass(
-                    in_channels
-                    if level == 0
-                    else num_fmaps * fmap_inc_factors ** (level - 1),
-                    num_fmaps * fmap_inc_factors**level,
-                    kernel_size_down[level],
-                    padding,
-                    activation=activation,
-                )
-                for level in range(self.num_levels)
-            ]
-        )
-        self.dims = self.l_conv[0].dims
-
-        # left downsample layers
-        self.l_down = nn.ModuleList(
-            [
-                Downsample(downsample_factors[level])
-                for level in range(self.num_levels - 1)
-            ]
-        )
-
+        self.l_conv = nn.ModuleList()
+        for level in range(self.depth):
+            fmaps_in, fmaps_out = self.compute_fmaps_encoder(level)
+            self.l_conv.append(
+                ConvPass(fmaps_in, fmaps_out, self.kernel_size, self.padding)
+            )
+        
+        self.l_down = nn.ModuleList()
+        for level in range(self.depth - 1):
+            self.l_down.append(Downsample(self.downsample_factor))
+        
         # right up/crop/concatenate layers
-        self.r_up = nn.ModuleList(
-            [
+        self.r_up = nn.ModuleList()
+        for level in range(self.depth - 1):
+            self.r_up.append(
                 Upsample(
-                    downsample_factors[level],
-                    mode="nearest" if constant_upsample else "transposed_conv",
-                    in_channels=num_fmaps * fmap_inc_factors ** (level + 1),
-                    out_channels=num_fmaps * fmap_inc_factors ** (level + 1),
-                    crop_factor=crop_factors[level],
-                    padding=padding,
-                    next_conv_kernel_sizes=kernel_size_up[level],
+                    downsample_factor,
+                    mode=self.upsample_mode,
                 )
-                for level in range(self.num_levels - 1)
-            ]
         )
+        self.crop_up = nn.ModuleList()
+        for level in range(self.depth - 1):
+            self.crop_up.append(CropAndConcat())
 
         # right convolutional passes
-        self.r_conv = nn.ModuleList(
-            [
-                ConvPass(
-                    num_fmaps * fmap_inc_factors**level
-                    + num_fmaps * fmap_inc_factors ** (level + 1),
-                    num_fmaps * fmap_inc_factors**level
-                    if num_fmaps_out is None or level != 0
-                    else num_fmaps_out,
-                    kernel_size_up[level],
-                    padding,
-                    activation=activation,
-                )
-                for level in range(self.num_levels - 1)
-            ]
-        )
+        self.r_conv = nn.ModuleList()
+        for level in range(self.depth - 1):
+            fmaps_in, fmaps_out = self.conmpute_fmaps_decode(level)
+            self.r_conv.append(
+                ConvPass(fmaps_in, fmaps_out, self.kernel_size, self.padding,)
+            )
 
-    def rec_fov(self, level, fov, sp):
+    def compute_fmaps_encoder(self, level: int) -> tuple[int, int]:
+        """ Compute the number of input and output feature maps for a conv block at a given level
+        of the UNet encoder. TODO: add args, output
+        """
+        if level == 0:
+            fmaps_in = self.in_channels
+        else:
+            fmaps_in = self.num_fmaps * self.fmap_inc_factor ** (level - 1)
 
-        # index of level in layer arrays
-        i = self.num_levels - level - 1
+        fmaps_out = self.num_fmaps * self.fmap_inc_factor ** level
+        return fmaps_in, fmaps_out
 
-        # convolve
-        for j in range(len(self.kernel_size_down[i])):
-            fov += (np.array(self.kernel_size_down[i][j]) - 1) * sp
+    def compute_fmaps_decode(self, level: int) -> tuple[int, int]:
+        """ Compute the number of input and output feature maps for a conv block at a given level
+        of the UNet decoder. TODO: add args, output
+        """
+        fmaps_out = self.num_fmaps * self.fmap_inc_factor ** (level)
+        concat_fmaps = self.compute_fmaps_encoder(level)[1]  # The channels that come from the skip connection
+        fmaps_in = concat_fmaps + self.num_fmaps * self.fmap_inc_factor ** (level + 1)
 
-        # end of recursion
-        if level != 0:
-            # down
-            fov += (np.array(self.downsample_factors[i]) - 1) * sp
-            sp *= np.array(self.downsample_factors[i])
-
-            # nested levels
-            fov, sp = self.rec_fov(level - 1, fov, sp)
-
-            # up
-            sp //= np.array(self.downsample_factors[i])
-
-            # convolve
-            for j in range(len(self.kernel_size_up[i])):
-                fov += (np.array(self.kernel_size_up[i][j]) - 1) * sp
-
-        return fov, sp
-
-    def get_fov(self):
-        fov, sp = self.rec_fov(self.num_levels - 1, (1, 1), 1)
-        return fov
+        return fmaps_in, fmaps_out 
 
     def rec_forward(self, level, f_in):
 
         # index of level in layer arrays
-        i = self.num_levels - level - 1
+        i = self.depth - level - 1
 
         # convolve
         f_left = self.l_conv[i](f_in)
@@ -396,7 +371,7 @@ class UNet(torch.nn.Module):
 
     def forward(self, x):
 
-        y = self.rec_forward(self.num_levels - 1, x)
+        y = self.rec_forward(self.depth - 1, x)
 
         return y
 
