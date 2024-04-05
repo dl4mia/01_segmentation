@@ -1,5 +1,5 @@
 # %% [markdown]
-# # Understanding the U-Net
+# # Build Your Own U-Net
 #
 # <hr style="height:2px;">
 #
@@ -9,7 +9,7 @@
 
 # %% [markdown]
 # <div class="alert alert-danger">
-# Please use kernel <code>05-semantic-segmentation</code> for this exercise.
+# Please use kernel <code>segmentation</code> for this exercise.
 # </div>
 
 # %% [markdown]
@@ -37,7 +37,6 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
-import torch.nn as nn
 from torchvision import transforms
 
 # %%
@@ -58,70 +57,126 @@ assert torch.cuda.is_available()
 # ### Convolution Block
 
 # %% [markdown]
-# TODO: Code exercise - target output should be somewhere between what Will did in the next block and the unet.py implementation in the following block
+# TODO: Explanation for pad computation (what is padding? what is valid/same? How to compute?)
 #
-# TODO: Write a test case and visualize the input/output of the conv block.
-
-# %%
-# Convolutional block for single layer of the decoder / encoder
-# we apply two 2d convolutions with relu activation
-def _conv_block(self, in_channels, out_channels):
-    return nn.Sequential(
-        nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-        nn.ReLU(),
-        nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-        nn.ReLU(),
-    )
-    
-# NOTE: this is different in the exercise than the unet.py
-# upsampling via transposed 2d convolutions
-def _upsampler(self, in_channels, out_channels):
-    return nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
-
+# TODO: Explanation for conv_pass layers (links to docs)
+#
+# TODO: Write a test case with defined (blur? Random?) kernel and visualize the input/output of the conv block.
 
 # %%
 # target output can be somewhere between the unet.py implementation - but I suggest sticking with two convs, relu 
 class ConvPass(torch.nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_sizes, padding, activation):
-
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, padding: str = "same"):
+        """ TODO: Docstring
+    
+        """
         super(ConvPass, self).__init__()
 
-        if activation is not None:
-            activation = getattr(torch.nn, activation)
+        # determine padding size based on method
+        if padding in ("VALID", "valid"):
+            pad = 0  # compute this
+        elif padding in ("SAME", "same"):
+            pad = tuple(np.array(kernel_size) // 2)  # compute this
+        else:
+            raise RuntimeError("invalid string value for padding")
 
-        layers = []
-
-        for kernel_size in kernel_sizes:
-            self.dims = len(kernel_size)
-            if padding in ("VALID", "valid"):
-                pad = 0
-            elif padding in ("SAME", "same"):
-                pad = tuple(np.array(kernel_size) // 2)
-            else:
-                raise RuntimeError("invalid string value for padding")
-            layers.append(
-                torch.nn.Conv2d(in_channels, out_channels, kernel_size, padding=pad)
+        # define layers in conv pass
+        self.conv_pass = torch.nn.Sequential(
+                torch.nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=pad), # leave out 
+                torch.nn.ReLU(), # leave out
+                torch.nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding=pad), # leave out
+                torch.nn.ReLU(), # leave out
             )
-            in_channels = out_channels
-
-            if activation is not None:
-                layers.append(activation())
-                layers.append(nn.BatchNorm2d(out_channels))
-
-        self.conv_pass = torch.nn.Sequential(*layers)
     
     def forward(self, x):
         return self.conv_pass(x)
 
+
 # %% [markdown]
 # ### Downsampling / Max Pooling
 
+# %% [markdown]
+# TODO: Explain downsampling (link to maxPool2d, mention other ways are possible but this is normal) (talk about invalid downsampling factor if input is bad size)
+#
+# TOOD: test case afterward
+
 # %%
+class Downsample(torch.nn.Module):
+    def __init__(self, downsample_factor: int):
+        """ TODO: Docstring
+        """
+
+        super(Downsample, self).__init__()
+
+        self.downsample_factor = downsample_factor
+
+        self.down = torch.nn.MaxPool2d(downsample_factor, stride=downsample_factor) # leave out
+
+    def check_valid(self, image_size: tuple[int, int]) -> bool:
+        """ Check if the downsample factor evenly divides each image dimension 
+        Note: there are multiple ways to do this!
+        """
+        for dim in image_size:
+            if dim % self.downsample_factor != 0:  # Leave out whole implementation
+                return False
+        return True
+    
+    def forward(self, x):
+        if not check_valid(tuple(x.size()[-2:])):
+            raise RuntimeError(
+                    "Can not downsample shape %s with factor %s"
+                    % (x.size(), self.downsample_factor)
+                )
+
+        return self.down(x)
+
 
 # %% [markdown]
 # ### Upsampling / Transpose Convolutions
 
 # %%
+class Upsample(torch.nn.Module):
+    def __init__(
+        self,
+        scale_factor: int,
+        mode: str = "nearest", # passed to torch.nn.Upsample
+    ):
+    """ TODO: docstring
+    """
+
+        super(Upsample, self).__init__()
+
+        assert (crop_factor is None) == (
+            next_conv_kernel_sizes is None
+        ), "crop_factor and next_conv_kernel_sizes have to be given together"
+
+        self.crop_factor = crop_factor
+        self.next_conv_kernel_sizes = next_conv_kernel_sizes
+
+        self.dims = len(scale_factor)
+
+        self.up = torch.nn.Upsample(scale_factor=tuple(scale_factor), mode=mode)
+
+    def crop(self, x, shape):
+        """Center-crop x to match spatial dimensions given by shape."""
+
+        x_target_size = x.size()[: -self.dims] + shape
+
+        offset = tuple((a - b) // 2 for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(slice(o, o + s) for o, s in zip(offset, x_target_size))
+
+        return x[slices]
+
+    def forward(self, f_left, g_out):
+
+        g_up = self.up(g_out)
+        g_cropped = g_up
+
+        f_cropped = self.crop(f_left, g_cropped.size()[-self.dims :])
+
+        return torch.cat([f_cropped, g_cropped], dim=1)
+    
 
 # %% [markdown]
 # ### Skip Connections and Concatenation
@@ -217,9 +272,9 @@ class UNet(nn.Module):
         )
         # the base convolution block
         if depth >= 1:
-            self.base = self._conv_block(2 ** (depth + 3), 2 ** (depth + 4))
+            self.base = conv_block(2 ** (depth + 3), 2 ** (depth + 4))
         else:
-            self.base = self._conv_block(1, 2 ** (depth + 4))
+            self.base = conv_block(1, 2 ** (depth + 4))
         # modules of the decoder path
         self.decoder = nn.ModuleList(
             [
