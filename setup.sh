@@ -1,8 +1,8 @@
 # this seems necessary for the activate call to work
 eval "$(conda shell.bash hook)"
 # Create environment name based on the exercise name
-mamba create -n unet_exercise python=3.10 -y
-mamba activate unet_exercise
+mamba create -n segmentation python=3.10 -y
+mamba activate segmentation
 # Install additional requirements
 mamba install -c pytorch -c nvidia --file requirements.txt -y
 # Build the notebooks
