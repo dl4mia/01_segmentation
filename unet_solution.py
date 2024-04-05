@@ -132,35 +132,44 @@ class Downsample(torch.nn.Module):
 
 
 # %% [markdown]
-# ### Upsampling / Transpose Convolutions
+# ### Upsampling
+
+# %% [markdown]
+# TODO: explanation (link torch.nn.Upsample) (hint that they pass factor not size)
+#
+# TODO: Test
 
 # %%
 class Upsample(torch.nn.Module):
     def __init__(
         self,
-        scale_factor: int,
+        scale_factor: int, # passed to torch.nn.Upsample
         mode: str = "nearest", # passed to torch.nn.Upsample
     ):
     """ TODO: docstring
     """
-
         super(Upsample, self).__init__()
+        self.up = torch.nn.Upsample(scale_factor=scale_factor, mode=mode) # leave out
 
-        assert (crop_factor is None) == (
-            next_conv_kernel_sizes is None
-        ), "crop_factor and next_conv_kernel_sizes have to be given together"
+    def forward(self, x):
+        return self.up(x)  # leave out
+    
 
-        self.crop_factor = crop_factor
-        self.next_conv_kernel_sizes = next_conv_kernel_sizes
 
-        self.dims = len(scale_factor)
+# %% [markdown]
+# ### Skip Connections and Concatenation
 
-        self.up = torch.nn.Upsample(scale_factor=tuple(scale_factor), mode=mode)
+# %% [markdown]
+# TODO: Add explanation
+#
+# TODO: Add test
 
-    def crop(self, x, shape):
-        """Center-crop x to match spatial dimensions given by shape."""
-
-        x_target_size = x.size()[: -self.dims] + shape
+# %%
+class CropAndConcat(torch.nn.Module):
+    def crop(self, x, y):
+        """Center-crop x to match spatial dimensions given by y."""
+        
+        x_target_size = x.size()[: -2] + y.size()[-2:]
 
         offset = tuple((a - b) // 2 for a, b in zip(x.size(), x_target_size))
 
@@ -169,19 +178,18 @@ class Upsample(torch.nn.Module):
         return x[slices]
 
     def forward(self, f_left, g_out):
+        """TODO: Docstring"""
+        f_cropped = self.crop(f_left, g_out) # leave this out
 
-        g_up = self.up(g_out)
-        g_cropped = g_up
-
-        f_cropped = self.crop(f_left, g_cropped.size()[-self.dims :])
-
-        return torch.cat([f_cropped, g_cropped], dim=1)
-    
+        return torch.cat([f_cropped, g_cropped], dim=1) # leave this out
 
 # %% [markdown]
-# ### Skip Connections and Concatenation
+# ### Output Block
 
-# %%
+# %% [markdown]
+# Create a final block for outputting what you want for your class. Different than normal conv block
+#
+# TODO: explanation, code, test
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
@@ -208,133 +216,190 @@ class Upsample(torch.nn.Module):
 
 
 # %% [markdown]
-# TODO: Decide on what we want the final implementation to look like. Then provide scaffolding where they can plug in/call the functions/classes they defined above
+# TODO: Finish cleaning up this UNet to match our defined solutions above. Then, decide which parts they should implement.
 
 # %%
-class UNet(nn.Module):
-    """U-Net implementation
-    Arguments:
-      in_channels: number of input channels
-      out_channels: number of output channels
-      final_activation: activation applied to the network output
-    """
 
-    # _conv_block and _upsampler are just helper functions to
-    # construct the model.
-    # encapsulating them like so also makes it easy to re-use
-    # the model implementation with different architecture elements
+class UNet(torch.nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        num_fmaps,
+        depth,
+        fmap_inc_factor,
+        downsample_factor,
+        kernel_size=3,
+        padding="VALID",
+        out_channels=1,
+    ):
+        """Create a U-Net::
+            f_in --> f_left --------------------------->> f_right--> f_out
+                        |                                   ^
+                        v                                   |
+                     g_in --> g_left ------->> g_right --> g_out
+                                 |               ^
+                                 v               |
+                                       ...
+        where each ``-->`` is a convolution pass, each `-->>` a crop, and down
+        and up arrows are max-pooling and transposed convolutions,
+        respectively.
+        The U-Net expects 2D tensors shaped like::
+            ``(batch=1, channels, height, width)``.
+        This U-Net performs only "valid" convolutions, i.e., sizes of the
+        feature maps decrease after each convolution.
+        Args:
+            in_channels:
+                The number of input channels.
+            num_fmaps:
+                The number of feature maps in the first layer. This is also the
+                number of output feature maps. Stored in the ``channels``
+                dimension.
+            fmap_inc_factor:
+                By how much to multiply the number of feature maps between
+                layers. If layer 0 has ``k`` feature maps, layer ``l`` will
+                have ``k*fmap_inc_factor**l``.
+            downsample_factor:
+                Factor to use for down- and up-sampling the
+                feature maps between layers.
+            kernel_size (optional):
+                Kernel size to use in convolutions on both sides of the UNet.
+                Defaults to 3.
+            padding (optional):
+                How to pad convolutions. Either 'same' or 'valid' (default).
+            out_channels (optional):
+                How many output channels you want. Depends on your task.
+        """
 
-    # Convolutional block for single layer of the decoder / encoder
-    # we apply two 2d convolutions with relu activation
-    def _conv_block(self, in_channels, out_channels):
-        return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.ReLU(),
-        )
+        super(UNet, self).__init__()
 
-    # upsampling via transposed 2d convolutions
-    def _upsampler(self, in_channels, out_channels):
-        return nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
-
-    def __init__(self, in_channels=1, out_channels=1, depth=4, final_activation=None):
-        super().__init__()
-
-        assert depth < 10, "Max supported depth is 9"
-
-        # the depth (= number of encoder / decoder levels) is
-        # hard-coded to 4
         self.depth = depth
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size_down = kernel_size_down
+        self.kernel_size_up = kernel_size_up
+        self.downsample_factor = downsample_factor
 
-        # the final activation must either be None or a Module
-        if final_activation is not None:
-            assert isinstance(
-                final_activation, nn.Module
-            ), "Activation must be torch module"
+        # modules
 
-        # all lists of conv layers (or other nn.Modules with parameters) must be wraped
-        # itnto a nn.ModuleList
-
-        # modules of the encoder path
-        self.encoder = nn.ModuleList(
+        # left convolutional passes
+        self.l_conv = nn.ModuleList(
             [
-                self._conv_block(in_channels, 16),
-                self._conv_block(16, 32),
-                self._conv_block(32, 64),
-                self._conv_block(64, 128),
-                self._conv_block(128, 256),
-                self._conv_block(256, 512),
-                self._conv_block(512, 1024),
-                self._conv_block(1024, 2048),
-                self._conv_block(2048, 4096),
-            ][:depth]
+                ConvPass(
+                    in_channels
+                    if level == 0
+                    else num_fmaps * fmap_inc_factors ** (level - 1),
+                    num_fmaps * fmap_inc_factors**level,
+                    kernel_size_down[level],
+                    padding,
+                    activation=activation,
+                )
+                for level in range(self.num_levels)
+            ]
         )
-        # the base convolution block
-        if depth >= 1:
-            self.base = conv_block(2 ** (depth + 3), 2 ** (depth + 4))
+        self.dims = self.l_conv[0].dims
+
+        # left downsample layers
+        self.l_down = nn.ModuleList(
+            [
+                Downsample(downsample_factors[level])
+                for level in range(self.num_levels - 1)
+            ]
+        )
+
+        # right up/crop/concatenate layers
+        self.r_up = nn.ModuleList(
+            [
+                Upsample(
+                    downsample_factors[level],
+                    mode="nearest" if constant_upsample else "transposed_conv",
+                    in_channels=num_fmaps * fmap_inc_factors ** (level + 1),
+                    out_channels=num_fmaps * fmap_inc_factors ** (level + 1),
+                    crop_factor=crop_factors[level],
+                    padding=padding,
+                    next_conv_kernel_sizes=kernel_size_up[level],
+                )
+                for level in range(self.num_levels - 1)
+            ]
+        )
+
+        # right convolutional passes
+        self.r_conv = nn.ModuleList(
+            [
+                ConvPass(
+                    num_fmaps * fmap_inc_factors**level
+                    + num_fmaps * fmap_inc_factors ** (level + 1),
+                    num_fmaps * fmap_inc_factors**level
+                    if num_fmaps_out is None or level != 0
+                    else num_fmaps_out,
+                    kernel_size_up[level],
+                    padding,
+                    activation=activation,
+                )
+                for level in range(self.num_levels - 1)
+            ]
+        )
+
+    def rec_fov(self, level, fov, sp):
+
+        # index of level in layer arrays
+        i = self.num_levels - level - 1
+
+        # convolve
+        for j in range(len(self.kernel_size_down[i])):
+            fov += (np.array(self.kernel_size_down[i][j]) - 1) * sp
+
+        # end of recursion
+        if level != 0:
+            # down
+            fov += (np.array(self.downsample_factors[i]) - 1) * sp
+            sp *= np.array(self.downsample_factors[i])
+
+            # nested levels
+            fov, sp = self.rec_fov(level - 1, fov, sp)
+
+            # up
+            sp //= np.array(self.downsample_factors[i])
+
+            # convolve
+            for j in range(len(self.kernel_size_up[i])):
+                fov += (np.array(self.kernel_size_up[i][j]) - 1) * sp
+
+        return fov, sp
+
+    def get_fov(self):
+        fov, sp = self.rec_fov(self.num_levels - 1, (1, 1), 1)
+        return fov
+
+    def rec_forward(self, level, f_in):
+
+        # index of level in layer arrays
+        i = self.num_levels - level - 1
+
+        # convolve
+        f_left = self.l_conv[i](f_in)
+
+        # end of recursion
+        if level == 0:
+            fs_out = f_left
         else:
-            self.base = conv_block(1, 2 ** (depth + 4))
-        # modules of the decoder path
-        self.decoder = nn.ModuleList(
-            [
-                self._conv_block(8192, 4096),
-                self._conv_block(4096, 2048),
-                self._conv_block(2048, 1024),
-                self._conv_block(1024, 512),
-                self._conv_block(512, 256),
-                self._conv_block(256, 128),
-                self._conv_block(128, 64),
-                self._conv_block(64, 32),
-                self._conv_block(32, 16),
-            ][-depth:]
-        )
+            # down
+            g_in = self.l_down[i](f_left)
+            # nested levels
+            gs_out = self.rec_forward(level - 1, g_in)
+            # up, concat, and crop
+            fs_right = self.r_up[i](f_left, gs_out)
 
-        # the pooling layers; we use 2x2 MaxPooling
-        self.poolers = nn.ModuleList([nn.MaxPool2d(2) for _ in range(self.depth)])
-        # the upsampling layers
-        self.upsamplers = nn.ModuleList(
-            [
-                self._upsampler(8192, 4096),
-                self._upsampler(4096, 2048),
-                self._upsampler(2048, 1024),
-                self._upsampler(1024, 512),
-                self._upsampler(512, 256),
-                self._upsampler(256, 128),
-                self._upsampler(128, 64),
-                self._upsampler(64, 32),
-                self._upsampler(32, 16),
-            ][-depth:]
-        )
-        # output conv and activation
-        # the output conv is not followed by a non-linearity, because we apply
-        # activation afterwards
-        self.out_conv = nn.Conv2d(16, out_channels, 1)
-        self.activation = final_activation
+            # convolve
+            fs_out = self.r_conv[i](fs_right)
 
-    def forward(self, input):
-        x = input
-        # apply encoder path
-        encoder_out = []
-        for level in range(self.depth):
-            x = self.encoder[level](x)
-            encoder_out.append(x)
-            x = self.poolers[level](x)
+        return fs_out
 
-        # apply base
-        x = self.base(x)
+    def forward(self, x):
 
-        # apply decoder path
-        encoder_out = encoder_out[::-1]
-        for level in range(self.depth):
-            x = self.upsamplers[level](x)
-            x = self.decoder[level](torch.cat((x, encoder_out[level]), dim=1))
+        y = self.rec_forward(self.num_levels - 1, x)
 
-        # apply output conv and activation (if given)
-        x = self.out_conv(x)
-        if self.activation is not None:
-            x = self.activation(x)
-        return x
+        return y
+
 
 
 # %% [markdown]
