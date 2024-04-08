@@ -106,6 +106,9 @@ class InstanceDataset(Dataset):
         image = self.inp_transforms(image)
         mask_path = os.path.join(self.root_dir, self.samples[idx], "mask.tif")
         mask = transforms.ToTensor()(Image.open(mask_path))
+        
+        # need to call create sdt target here
+        
         if self.transform is not None:
             # Note: using seeds to ensure the same random transform is applied to
             # the image and mask
@@ -133,8 +136,12 @@ train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
 val_data = InstanceDataset("nuclei_val_data", transforms.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
+# add the augmentations that you want
 unet = UNet(...)
+
+# choose a loss function (here are a few options to consider)
 loss = 
+
 optimizer = torch.optim.Adam(unet.parameters())
 
 for epoch in range(10):
@@ -152,13 +159,72 @@ for epoch in range(10):
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
-# <h2> Checkpoint 0 </h2>
+# <h2> Checkpoint 1 </h2>
 # %% [markdown]
 # <hr style="height:2px;">
 #
 # ## Section 2: Post-Processing
 # What is watershed?
 # How do we get seed points?
+
+#%%
+from scipy.ndimage import label_cc, maximum_filter
+from scipy.segmentation import watershed
+
+def watershed_from_boundary_distance(
+        boundary_distances: np.ndarray,
+        boundary_mask: np.ndarray,
+        id_offset: float = 0,
+        min_seed_distance: int = 10
+        ):
+    """Function to compute a watershed from boundary distances."""
+
+    # get our seeds 
+    # make them write a function to find maximum values?
+    max_filtered = maximum_filter(boundary_distances, min_seed_distance)
+    maxima = max_filtered==boundary_distances
+    seeds, n = label_cc(maxima)
+
+    if n == 0:
+        return np.zeros(boundary_distances.shape, dtype=np.uint64), id_offset
+
+    seeds[seeds!=0] += id_offset
+
+    # calculate our segmentation
+    segmentation = watershed(
+        boundary_distances.max() - boundary_distances,
+        seeds,
+        mask=boundary_mask)
+    
+    return segmentation
+
+def get_boundary_mask(pred, threshold):
+    boundary_mask = pred > threshold
+    return boundary_mask
+#%%
+net.eval()
+for idx, (image, mask) in enumerate(test_loader):
+    image = image.to(device)
+    logits = net(image)
+    pred = activation(logits)
+        
+    image = np.squeeze(image.cpu())
+    mask = np.squeeze(mask.cpu().numpy())
+        
+    pred = np.squeeze(pred.cpu().detach().numpy())
+    
+    # feel free to try different thresholds
+    thresh = np.mean(pred)
+    
+    # get boundary mask
+    boundary_mask = get_boundary_mask(pred, thresh=thresh)
+
+    seg = watershed_from_boundary_distance(
+        pred,
+        boundary_mask,
+        id_offset=0
+        min_seed_distance=10)
+
 
 # %% [markdown]
 # <hr style="height:2px;">
@@ -167,11 +233,42 @@ for epoch in range(10):
 # Which evaluation metric should we use
 # Use this website to pick a good one
 
+https://metrics-reloaded.dkfz.de/problem-category-selection
+
+# Here is an implementation for 10 common metrics, choose which one you think is best.
+
+
 # %% [markdown]
 # <hr style="height:2px;">
 #
 # ## Section 4: Affinities
+#%%
 # add create affinities method to the dataset
+def compute_affinities(seg: np.ndarray, nhood: list):
+
+    nhood = np.array(nhood)
+
+    shape = seg.shape
+    nEdge = nhood.shape[0]
+    dims = nhood.shape[1]
+    aff = np.zeros((nEdge,) + shape, dtype=np.int32)
+
+    for e in range(nEdge):
+        aff[e, \
+          max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
+          max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] = \
+                      (seg[max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
+                          max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] == \
+                        seg[max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]), \
+                          max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] ) \
+                      * ( seg[max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
+                          max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] > 0 ) \
+                      * ( seg[max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]), \
+                          max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] > 0 )
+                          
+
+    return aff
+
 # make needed changes to the model
 # train model
 # post-processing
