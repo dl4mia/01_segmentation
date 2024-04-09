@@ -5,7 +5,6 @@
 #
 # In this notebook, we adapt our 2D U-Net for better nuclei segmentations in the Kaggle Nuclei dataset.
 #
-# Written by Valentyna Zinchenko, Constantin Pape and William Patton.
 
 # %% [markdown]
 # <div class="alert alert-danger">
@@ -37,18 +36,18 @@ from tqdm import tqdm
 # %%
 # make sure gpu is available. Please call a TA if this cell fails
 assert torch.cuda.is_available()
-
 # %% [markdown]
 # ## Visualize the data:
+# For instance segmentation, the specific value of the label is arbitrary
+# This means we cannot train directly on those labels
+# image table of different labels --> say all are equivalently good
 
-# %% [markdown]
-# <div class="alert alert-block alert-success">
-# <h2> Checkpoint 0 </h2>
 
 # %% [markdown]
 # <hr style="height:2px;">
 #
 # ## Section 1: Signed Distance Transform
+# what is the signed distance transform, with image examples
 
 # %% [markdown]
 # Create the  DataSet
@@ -69,8 +68,6 @@ def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
 
     return distance
 
-#%% [markdown]
-# take the dataset from local.py and add create SDT target function
 
 #%% tags [solution]
 # take the dataset from local.py and add create SDT target function
@@ -108,7 +105,7 @@ class InstanceDataset(Dataset):
         mask = transforms.ToTensor()(Image.open(mask_path))
         
         # need to call create sdt target here
-        
+
         if self.transform is not None:
             # Note: using seeds to ensure the same random transform is applied to
             # the image and mask
@@ -128,6 +125,7 @@ class InstanceDataset(Dataset):
 # Adjust the Unet to this new prediction
 # Which loss function should we use
 # train the model
+from local import train, show_random_dataset_image
 
 from unet import UNet
 
@@ -136,6 +134,9 @@ train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
 val_data = InstanceDataset("nuclei_val_data", transforms.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
+show_random_dataset_image(train_data)
+
+#%%
 # add the augmentations that you want
 unet = UNet(...)
 
@@ -156,6 +157,9 @@ for epoch in range(10):
 
 #%% 
 # take a look at the results
+# evaluate model and plot resulting distance transform
+
+# This looks good, but it isn't quite what we want yet
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
@@ -203,7 +207,7 @@ def get_boundary_mask(pred, threshold):
     return boundary_mask
 #%%
 net.eval()
-for idx, (image, mask) in enumerate(test_loader):
+for idx, (image, mask) in enumerate(val_loader):
     image = image.to(device)
     logits = net(image)
     pred = activation(logits)
@@ -235,7 +239,16 @@ for idx, (image, mask) in enumerate(test_loader):
 
 https://metrics-reloaded.dkfz.de/problem-category-selection
 
-# Here is an implementation for 10 common metrics, choose which one you think is best.
+# Which metric do you think is best for this dataset
+
+# 3 -5 example problems with images, want them to choose which metric is best for each
+
+# 1. cells that are mostly round, but have long protrusions, where our goal is to quantify the number of protrusions
+
+# 2. mixed population of 2 cells, where our goal is to segment 
+# 1 population form the other and count the number of cells of that population
+
+# 3. Cells with many small specs where the goal is to segment and count the number of specs
 
 
 # %% [markdown]
@@ -279,4 +292,8 @@ def compute_affinities(seg: np.ndarray, nhood: list):
 #
 # ## Section 5: Pre-Trained Models
 # try running cellpose from script
+
+#%%
+import cellpose
+
 
