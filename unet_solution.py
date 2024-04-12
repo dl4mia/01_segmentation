@@ -16,9 +16,7 @@
 # Proposed outline of exercise:
 # 1. Go through each component (convolution block, max pooling, transposed convolution, sigmoid, skip connection and concatenation), "implement", and verify on a small example.
 # 2. Put these together into a U-Net model with arguments controlling the presence or number of each. Test on a small example (data provided).
-# 3. Train with various configurations, similar to Will's exercise below, but with actually training multiple configurations (e.g. with and without skip connections), and visually inspect training samples in tensorboard. Use semantic segmentation on kaggle dataset with provided training and no validation, no augmentation, and no quantiative metrics (leave these for actual semantic segmentation exercise. 
-
-# %%
+# 3. Train with various configurations, similar to Will's exercise below, but with actually training multiple configurations (e.g. with and without skip connections), and visually inspect training samples in tensorboard. Use semantic segmentation on kaggle dataset with provided training and no validation, no augmentation, and no quantiative metrics (leave these for actual semantic segmentation exercise.
 
 # %% [markdown]
 # <hr style="height:2px;">
@@ -26,8 +24,8 @@
 # ## The libraries
 
 # %%
-%matplotlib inline
-%load_ext tensorboard
+# %matplotlib inline
+# %load_ext tensorboard
 import os
 from pathlib import Path
 import imageio
@@ -38,6 +36,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
+from typing import Optional
 
 # %%
 # make sure gpu is available. Please call a TA if this cell fails
@@ -63,13 +62,18 @@ assert torch.cuda.is_available()
 #
 # TODO: Write a test case with defined (blur? Random?) kernel and visualize the input/output of the conv block.
 
+
 # %%
-# target output can be somewhere between the unet.py implementation - but I suggest sticking with two convs, relu 
+# target output can be somewhere between the unet.py implementation - but I suggest sticking with two convs, relu
 class ConvPass(torch.nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, padding: str = "same"):
-        """ TODO: Docstring
-    
-        """
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        padding: str = "same",
+    ):
+        """TODO: Docstring"""
         super(ConvPass, self).__init__()
 
         # determine padding size based on method
@@ -82,12 +86,16 @@ class ConvPass(torch.nn.Module):
 
         # define layers in conv pass
         self.conv_pass = torch.nn.Sequential(
-                torch.nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=pad), # leave out 
-                torch.nn.ReLU(), # leave out
-                torch.nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding=pad), # leave out
-                torch.nn.ReLU(), # leave out
-            )
-    
+            torch.nn.Conv2d(
+                in_channels, out_channels, kernel_size=kernel_size, padding=pad
+            ),  # leave out
+            torch.nn.ReLU(),  # leave out
+            torch.nn.Conv2d(
+                out_channels, out_channels, kernel_size=kernel_size, padding=pad
+            ),  # leave out
+            torch.nn.ReLU(),  # leave out
+        )
+
     def forward(self, x):
         return self.conv_pass(x)
 
@@ -100,33 +108,35 @@ class ConvPass(torch.nn.Module):
 #
 # TOOD: test case afterward
 
+
 # %%
 class Downsample(torch.nn.Module):
     def __init__(self, downsample_factor: int):
-        """ TODO: Docstring
-        """
+        """TODO: Docstring"""
 
         super(Downsample, self).__init__()
 
         self.downsample_factor = downsample_factor
 
-        self.down = torch.nn.MaxPool2d(downsample_factor, stride=downsample_factor) # leave out
+        self.down = torch.nn.MaxPool2d(
+            downsample_factor, stride=downsample_factor
+        )  # leave out
 
     def check_valid(self, image_size: tuple[int, int]) -> bool:
-        """ Check if the downsample factor evenly divides each image dimension 
+        """Check if the downsample factor evenly divides each image dimension
         Note: there are multiple ways to do this!
         """
         for dim in image_size:
             if dim % self.downsample_factor != 0:  # Leave out whole implementation
                 return False
         return True
-    
+
     def forward(self, x):
         if not check_valid(tuple(x.size()[-2:])):
             raise RuntimeError(
-                    "Can not downsample shape %s with factor %s"
-                    % (x.size(), self.downsample_factor)
-                )
+                "Can not downsample shape %s with factor %s"
+                % (x.size(), self.downsample_factor)
+            )
 
         return self.down(x)
 
@@ -139,21 +149,20 @@ class Downsample(torch.nn.Module):
 #
 # TODO: Test
 
+
 # %%
 class Upsample(torch.nn.Module):
     def __init__(
         self,
-        scale_factor: int, # passed to torch.nn.Upsample
-        mode: str = "nearest", # passed to torch.nn.Upsample
+        scale_factor: int,  # passed to torch.nn.Upsample
+        mode: str = "nearest",  # passed to torch.nn.Upsample
     ):
-    """ TODO: docstring
-    """
+        """TODO: docstring"""
         super(Upsample, self).__init__()
-        self.up = torch.nn.Upsample(scale_factor=scale_factor, mode=mode) # leave out
+        self.up = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)  # leave out
 
     def forward(self, x):
         return self.up(x)  # leave out
-    
 
 
 # %% [markdown]
@@ -164,12 +173,13 @@ class Upsample(torch.nn.Module):
 #
 # TODO: Add test
 
+
 # %%
 class CropAndConcat(torch.nn.Module):
     def crop(self, x, y):
         """Center-crop x to match spatial dimensions given by y."""
-        
-        x_target_size = x.size()[: -2] + y.size()[-2:]
+
+        x_target_size = x.size()[:-2] + y.size()[-2:]
 
         offset = tuple((a - b) // 2 for a, b in zip(x.size(), x_target_size))
 
@@ -179,9 +189,10 @@ class CropAndConcat(torch.nn.Module):
 
     def forward(self, f_left, g_out):
         """TODO: Docstring"""
-        f_cropped = self.crop(f_left, g_out) # leave this out
+        f_cropped = self.crop(f_left, g_out)  # leave this out
 
-        return torch.cat([f_cropped, g_cropped], dim=1) # leave this out
+        return torch.cat([f_cropped, g_cropped], dim=1)  # leave this out
+
 
 # %% [markdown]
 # ### Output Block
@@ -189,13 +200,40 @@ class CropAndConcat(torch.nn.Module):
 # %% [markdown]
 # Create a final block for outputting what you want for your class. Different than normal conv block
 #
-# TODO: explanation, code, test
+# TODO: explanation, test
+
+
+# %%
+class OutputConv(torch.nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        activation: Optional[
+            str
+        ] = None,  # Accepts the name of any torch activation function (e.g., ``ReLU`` for ``torch.nn.ReLU``).
+    ):
+        """
+        Use a convolution with kernel size 1 to obtain the appropriate number of output channels. Then apply final activation.
+
+        """
+
+        conv = torch.nn.Conv2D(in_channels, out_channels, 1, padding=0)
+        if activation is not None:
+            activation = getattr(torch.nn, activation)
+            self.final_conv = torch.nn.Sequential[conv, activation]
+        else:
+            self.final_conv = conv
+
+    def forward(self, x):
+        return self.final_conv(x)
+
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 1</h2>
 #
-# Congratulations! You have implemented most of a U-Net! 
+# Congratulations! You have implemented most of a U-Net!
 #
 # Here are some questions for you to consider.
 # TODO:
@@ -219,6 +257,7 @@ class CropAndConcat(torch.nn.Module):
 # TODO: Finish cleaning up this UNet to match our defined solutions above. Then, decide which parts they should implement.
 
 # %%
+
 
 class UNet(torch.nn.Module):
     def __init__(
@@ -287,7 +326,7 @@ class UNet(torch.nn.Module):
         self.out_channels = out_channels
         self.kernel_size = kernel_size
         self.padding = padding
-        self.final_activation = final_activate
+        self.final_activation = final_activation
         self.out_channels = out_channels
 
         # left convolutional passes
@@ -297,11 +336,11 @@ class UNet(torch.nn.Module):
             self.l_conv.append(
                 ConvPass(fmaps_in, fmaps_out, self.kernel_size, self.padding)
             )
-        
+
         self.l_down = nn.ModuleList()
         for level in range(self.depth - 1):
             self.l_down.append(Downsample(self.downsample_factor))
-        
+
         # right up/crop/concatenate layers
         self.r_up = nn.ModuleList()
         for level in range(self.depth - 1):
@@ -310,7 +349,7 @@ class UNet(torch.nn.Module):
                     downsample_factor,
                     mode=self.upsample_mode,
                 )
-        )
+            )
         self.crop_up = nn.ModuleList()
         for level in range(self.depth - 1):
             self.crop_up.append(CropAndConcat())
@@ -318,13 +357,21 @@ class UNet(torch.nn.Module):
         # right convolutional passes
         self.r_conv = nn.ModuleList()
         for level in range(self.depth - 1):
-            fmaps_in, fmaps_out = self.conmpute_fmaps_decode(level)
+            fmaps_in, fmaps_out = self.cnmpute_fmaps_decode(level)
             self.r_conv.append(
-                ConvPass(fmaps_in, fmaps_out, self.kernel_size, self.padding,)
+                ConvPass(
+                    fmaps_in,
+                    fmaps_out,
+                    self.kernel_size,
+                    self.padding,
+                )
             )
+        self.final_conv = OutputConv(
+            self.compute_fmaps_decode(0)[1], self.out_channels, self.final_activation
+        )
 
     def compute_fmaps_encoder(self, level: int) -> tuple[int, int]:
-        """ Compute the number of input and output feature maps for a conv block at a given level
+        """Compute the number of input and output feature maps for a conv block at a given level
         of the UNet encoder. TODO: add args, output
         """
         if level == 0:
@@ -332,18 +379,20 @@ class UNet(torch.nn.Module):
         else:
             fmaps_in = self.num_fmaps * self.fmap_inc_factor ** (level - 1)
 
-        fmaps_out = self.num_fmaps * self.fmap_inc_factor ** level
+        fmaps_out = self.num_fmaps * self.fmap_inc_factor**level
         return fmaps_in, fmaps_out
 
     def compute_fmaps_decode(self, level: int) -> tuple[int, int]:
-        """ Compute the number of input and output feature maps for a conv block at a given level
+        """Compute the number of input and output feature maps for a conv block at a given level
         of the UNet decoder. TODO: add args, output
         """
         fmaps_out = self.num_fmaps * self.fmap_inc_factor ** (level)
-        concat_fmaps = self.compute_fmaps_encoder(level)[1]  # The channels that come from the skip connection
+        concat_fmaps = self.compute_fmaps_encoder(level)[
+            1
+        ]  # The channels that come from the skip connection
         fmaps_in = concat_fmaps + self.num_fmaps * self.fmap_inc_factor ** (level + 1)
 
-        return fmaps_in, fmaps_out 
+        return fmaps_in, fmaps_out
 
     def rec_forward(self, level, f_in):
 
@@ -373,8 +422,7 @@ class UNet(torch.nn.Module):
 
         y = self.rec_forward(self.depth - 1, x)
 
-        return y
-
+        return self.final_conv(y)
 
 
 # %% [markdown]
@@ -403,13 +451,13 @@ unetD = torch.nn.Sequential(
 # %%
 # Provide your guesses as to what, if anything, might go wrong with each of these models:
 #
-# unetA: 
+# unetA:
 #
-# unetB: 
+# unetB:
 #
-# unetC: 
+# unetC:
 #
-# unetD: 
+# unetD:
 
 favorite_unet: UNet = ...
 
@@ -441,10 +489,10 @@ favorite_unet: UNet = unetA
 
 # %% [markdown]
 # ## Let's try the UNet!
-# We will get more into the details of training and evaluating semantic segmentation models in the next exercise. For now, we will provide an example pipeline that will train a UNet to classify each pixel in an image of cells as foreground or background. 
+# We will get more into the details of training and evaluating semantic segmentation models in the next exercise. For now, we will provide an example pipeline that will train a UNet to classify each pixel in an image of cells as foreground or background.
 
 # %% [markdown]
-# TODO: add back in the data loaders (without augmentation) and 
+# TODO: add back in the data loaders (without augmentation) and
 
 # %% tags=["solution"]
 loss_function: torch.nn.Module = nn.BCELoss()
@@ -555,11 +603,11 @@ train(
 
 # %%
 # start a tensorboard writer
-logger = SummaryWriter('runs/Unet')
-%tensorboard --logdir runs
+logger = SummaryWriter("runs/Unet")
+# %tensorboard --logdir runs
 
 # %%
-# Here is where students can define their own unet with whatever parameters they want to try, 
+# Here is where students can define their own unet with whatever parameters they want to try,
 # or use one of the examples from the thought exercise
 model = UNet(...)
 
@@ -746,8 +794,7 @@ class DiceLoss(nn.Module):
         super().__init__()
         self.dice_coefficient = DiceCoefficient()
 
-    def forward(self, x, y):
-        ...
+    def forward(self, x, y): ...
 
 
 # %% tags=["solution"]
@@ -811,4 +858,3 @@ for epoch in range(n_epochs):
     )
     step = epoch * num_train_pairs
     validate(net, val_loader, loss_func, metric, step=step, tb_logger=logger)
-
