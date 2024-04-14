@@ -1,5 +1,5 @@
 # Run black on .py files
-black unet_solution.py semantic_solution.py
+black unet_solution.py semantic_solution.py instance_solution.py
 
 # Convert .py to ipynb
 # "cell_metadata_filter": "all" preserve cell tags including our solution tags
