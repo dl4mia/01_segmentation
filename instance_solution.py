@@ -22,6 +22,7 @@ import os
 import random
 import torch
 import datetime
+from PIL import Image
 
 from glob import glob
 from natsort import natsorted
@@ -54,7 +55,7 @@ assert torch.cuda.is_available()
 
 # %% tags=["solution"]
 # write a function to calculate SDT
-from scipy.ndimage import distance_transform_edt
+from scipy.ndimage import distance_transform_edt, binary_erosion
 
 def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
     """Function to compute a signed distance transform."""
@@ -68,9 +69,32 @@ def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
 
     return distance
 
+#%%
+# small box to visualize the signed distance transform
+from local import NucleiDataset, show_random_dataset_image
+train_data = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
+
+idx = np.random.randint(0, len(train_data))  # take a random sample
+img, mask = train_data[idx]  # get the image and the nuclei masks
+
+f, axarr = plt.subplots(1, 2)  # make two plots on one figure
+axarr[0].imshow(img[0])  # show the image
+axarr[1].imshow(compute_sdt(mask[0]), interpolation=None)  # show the masks
+_ = [ax.axis("off") for ax in axarr]  # remove the axes
+print("Image size is %s" % {img[0].shape})
+plt.show()
+
+#%% tags [markdown]
+# Questions
+# 1. What is the purpose of the tanh function in computing our signed distance transform?
+# 2. What is the effect of changing the scale value? what do you think is a good default value? why?
+
 
 #%% tags [solution]
 # take the dataset from local.py and add create SDT target function
+# 1. add a create_sdt_target function to this class
+# 2. Change the __get_item__ method to return the sdt output rather than the mask
+#   2a. think about how transformations will affect the SDT vs mask
 class InstanceDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
@@ -103,9 +127,6 @@ class InstanceDataset(Dataset):
         image = self.inp_transforms(image)
         mask_path = os.path.join(self.root_dir, self.samples[idx], "mask.tif")
         mask = transforms.ToTensor()(Image.open(mask_path))
-        
-        # need to call create sdt target here
-
         if self.transform is not None:
             # Note: using seeds to ensure the same random transform is applied to
             # the image and mask
@@ -114,12 +135,14 @@ class InstanceDataset(Dataset):
             image = self.transform(image)
             torch.manual_seed(seed)
             mask = self.transform(mask)
+            sdt_mask = self.create_sdt_target(mask)
         if self.img_transform is not None:
             image = self.img_transform(image)
-        return image, mask
+        return image, sdt_mask
     
     def create_sdt_target(self, mask):
-        # TODO: fill in with SDT function
+        sdt_target = compute_sdt(mask, constant=0.5, scale=5)
+        return sdt_target
 
 #%%
 # Adjust the Unet to this new prediction
@@ -138,10 +161,10 @@ show_random_dataset_image(train_data)
 
 #%%
 # add the augmentations that you want
-unet = UNet(...)
+unet = UNet()
 
 # choose a loss function (here are a few options to consider)
-loss = 
+loss = torch.nn.BCELoss()
 
 optimizer = torch.optim.Adam(unet.parameters())
 
