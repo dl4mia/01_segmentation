@@ -57,6 +57,7 @@ assert torch.cuda.is_available()
 # ### Convolution Block
 
 # %% [markdown]
+# #### Convolution
 # A U-Net is a convolutional neural network, which means that the main type of operation is a convolution. Convolutions with defined kernels were covered briefly in the pre-course materials.
 #
 # <img src="./static/2D_Convolution_Animation.gif" width="400" height="300">
@@ -67,15 +68,24 @@ assert torch.cuda.is_available()
 
 
 # %% [markdown]
-# You will notice that at the edges of the input, this animation shows greyed out values that extend past the input. This is known as padding the input. This example uses "same" padding, which means the values at the edges are repeated. The other option we will use in this exercise is "valid" padding, which essentially means no padding. In the case of valid padding, the output will be smaller than the input, as values at the edges of the output will not be computed. "Same" padding can introduce edge artifacts, but "valid" padding loses output size at every convolution.
+# #### Padding
 #
-# TODO: Explanation for conv_pass layers (links to docs)
+# You will notice that at the edges of the input, this animation shows greyed out values that extend past the input. This is known as padding the input. This example uses "same" padding, which means the values at the edges are repeated. The other option we will use in this exercise is "valid" padding, which essentially means no padding. In the case of valid padding, the output will be smaller than the input, as values at the edges of the output will not be computed. "Same" padding can introduce edge artifacts, but "valid" padding loses output size at every convolution. Note that the amount of padding (for same) and the amount of size lost (for valid) depends on the size of the kernel - a 3x3 convolution would require padding of 1, a 5x5 convolution would require a padding of 2, and so on.
+
+
+# %% [markdown]
+# #### ReLU Activation
+# The Rectified Linear Unit (ReLU) is a common activation function, which takes the max of a value and 0, shown below. It introduces a non-linearity into the neural network - without a non-linear activation function, a neural network could not learn non-linear functions.
 #
-# TODO: Write a test case with defined (blur? Random?) kernel and visualize the input/output of the conv block.
+# <img src="./static/ReLU.png" width="400" height="300">
+
+# %% [markdown]
+# #### Convolution block
+# The convolution block (ConvBlock) of a standard U-Net has two 3x3 convolutions, each of which is followed by a ReLU activation. Our implementation will handle other sizes of convolutions as well. The first convolution in the block will handle changing the input number of feature maps/channels into the output, and the second convolution will have the same number of feature maps in and out. You will use [torch.nn.Conv2D](https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html#torch.nn.Conv2d) and [torch.nn.ReLU](https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU) to implement the ConvBlock below.
 
 
 # %%
-class ConvPass(torch.nn.Module):
+class ConvBlock(torch.nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -83,7 +93,16 @@ class ConvPass(torch.nn.Module):
         kernel_size: int,
         padding: str = "same",
     ):
-        """TODO: Docstring"""
+        """ A convolution block for a U-Net. Contains two convolutions, each followed by a ReLU.
+
+        Args:
+            in_channels (int): The number of input channels for this conv block. Depends on
+                the layer and side of the U-Net and the hyperparameters.
+            out_channels (int): The number of output channels for this conv block. Depends on
+                the layer and side of the U-Net and the hyperparameters.
+            kernel_size (int): The size of the kernel. A kernel size of N signifies an
+                NxN square kernel.
+        """
         super(ConvPass, self).__init__()
 
         # determine padding size based on method
@@ -345,7 +364,7 @@ class UNet(torch.nn.Module):
         for level in range(self.depth):
             fmaps_in, fmaps_out = self.compute_fmaps_encoder(level)
             self.l_conv.append(
-                ConvPass(fmaps_in, fmaps_out, self.kernel_size, self.padding)
+                ConvBlock(fmaps_in, fmaps_out, self.kernel_size, self.padding)
             )
 
         self.l_down = torch.nn.ModuleList()
