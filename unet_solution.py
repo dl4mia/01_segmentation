@@ -37,6 +37,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 from typing import Optional
+from local import NucleiDataset, show_random_dataset_image, train
 
 # %%
 # make sure gpu is available. Please call a TA if this cell fails
@@ -89,7 +90,7 @@ class ConvPass(torch.nn.Module):
         if padding in ("VALID", "valid"):
             pad = 0  # compute this
         elif padding in ("SAME", "same"):
-            pad = tuple(np.array(kernel_size) // 2)  # compute this
+            pad = kernel_size // 2  # compute this
         else:
             raise RuntimeError("invalid string value for padding")
 
@@ -141,7 +142,7 @@ class Downsample(torch.nn.Module):
         return True
 
     def forward(self, x):
-        if not check_valid(tuple(x.size()[-2:])):
+        if not self.check_valid(tuple(x.size()[-2:])):
             raise RuntimeError(
                 "Can not downsample shape %s with factor %s"
                 % (x.size(), self.downsample_factor)
@@ -200,7 +201,7 @@ class CropAndConcat(torch.nn.Module):
         """TODO: Docstring"""
         f_cropped = self.crop(f_left, g_out)  # leave this out
 
-        return torch.cat([f_cropped, g_cropped], dim=1)  # leave this out
+        return torch.cat([f_cropped, g_out], dim=1)  # leave this out
 
 
 # %% [markdown]
@@ -226,8 +227,8 @@ class OutputConv(torch.nn.Module):
         Use a convolution with kernel size 1 to obtain the appropriate number of output channels. Then apply final activation.
 
         """
-
-        conv = torch.nn.Conv2D(in_channels, out_channels, 1, padding=0)
+        super().__init__()
+        conv = torch.nn.Conv2d(in_channels, out_channels, 1, padding=0)
         if activation is not None:
             activation = getattr(torch.nn, activation)
             self.final_conv = torch.nn.Sequential[conv, activation]
@@ -283,7 +284,7 @@ class UNet(torch.nn.Module):
         out_channels=1,
     ):
         """Create a U-Net::
-            f_in --> f_left --------------------------->> f_right--> f_out
+            f_in --> f_left ------------------>> f_right + f_up--> f_out
                         |                                   ^
                         v                                   |
                      g_in --> g_left ------->> g_right --> g_out
@@ -335,23 +336,24 @@ class UNet(torch.nn.Module):
         self.out_channels = out_channels
         self.kernel_size = kernel_size
         self.padding = padding
+        self.upsample_mode = upsample_mode
         self.final_activation = final_activation
         self.out_channels = out_channels
 
         # left convolutional passes
-        self.l_conv = nn.ModuleList()
+        self.l_conv = torch.nn.ModuleList()
         for level in range(self.depth):
             fmaps_in, fmaps_out = self.compute_fmaps_encoder(level)
             self.l_conv.append(
                 ConvPass(fmaps_in, fmaps_out, self.kernel_size, self.padding)
             )
 
-        self.l_down = nn.ModuleList()
+        self.l_down = torch.nn.ModuleList()
         for level in range(self.depth - 1):
             self.l_down.append(Downsample(self.downsample_factor))
 
         # right up/crop/concatenate layers
-        self.r_up = nn.ModuleList()
+        self.r_up = torch.nn.ModuleList()
         for level in range(self.depth - 1):
             self.r_up.append(
                 Upsample(
@@ -359,14 +361,14 @@ class UNet(torch.nn.Module):
                     mode=self.upsample_mode,
                 )
             )
-        self.crop_up = nn.ModuleList()
+        self.crop_up = torch.nn.ModuleList()
         for level in range(self.depth - 1):
             self.crop_up.append(CropAndConcat())
 
         # right convolutional passes
-        self.r_conv = nn.ModuleList()
+        self.r_conv = torch.nn.ModuleList()
         for level in range(self.depth - 1):
-            fmaps_in, fmaps_out = self.cnmpute_fmaps_decode(level)
+            fmaps_in, fmaps_out = self.compute_fmaps_decode(level)
             self.r_conv.append(
                 ConvPass(
                     fmaps_in,
@@ -420,7 +422,8 @@ class UNet(torch.nn.Module):
             # nested levels
             gs_out = self.rec_forward(level - 1, g_in)
             # up, concat, and crop
-            fs_right = self.r_up[i](f_left, gs_out)
+            f_up = self.r_up[i](gs_out)
+            fs_right = self.crop_up[i](f_left, f_up)
 
             # convolve
             fs_out = self.r_conv[i](fs_right)
@@ -434,54 +437,18 @@ class UNet(torch.nn.Module):
         return self.final_conv(y)
 
 
-# %% [markdown]
-# <div class="alert alert-block alert-info">
-#     <b>Task 2.1</b>: Spot the best U-Net
-#
-# In the next cell you fill find a series of U-Net definitions. Most of them won't work. Some of them will work but not well. One will do well. Can you identify which model is the winner? Unfortunately you can't yet test your hypotheses yet since we have not covered loss functions, optimizers, and train/validation loops.
-#
-# </div>
-
 # %%
-unetA = UNet(
-    in_channels=1, out_channels=1, depth=4, final_activation=torch.nn.Sigmoid()
-)
-unetB = UNet(in_channels=1, out_channels=1, depth=9, final_activation=None)
-unetC = torch.nn.Sequential(
-    UNet(in_channels=1, out_channels=1, depth=4, final_activation=torch.nn.ReLU()),
-    torch.nn.Sigmoid(),
-)
-unetD = torch.nn.Sequential(
-    UNet(in_channels=1, out_channels=1, depth=1, final_activation=None),
-    torch.nn.Sigmoid(),
-)
-
-
-# %%
-# Provide your guesses as to what, if anything, might go wrong with each of these models:
-#
-# unetA:
-#
-# unetB:
-#
-# unetC:
-#
-# unetD:
-
-favorite_unet: UNet = ...
-
-# %% tags=["solution"]
-# Provide your guesses as to what, if anything, might go wrong with each of these models:
-#
-# unetA: The correct unet.
-#
-# unetB: Too deep. You won't be able to train with input size 256 since the lowest level will get zero sized tensors.
-#
-# unetC: A classic mistake putting a Sigmoid after a Relu activation. You will never predict anything < 0.5
-#
-# unetD: barely any depth to this unet. It should train and give you what you want, I just wouldn't expect good performance
-
-favorite_unet: UNet = unetA
+simple_net = UNet(
+        depth=2,
+        in_channels=1,
+        num_fmaps=12,
+        fmap_inc_factor=3,
+        downsample_factor=2,
+        kernel_size=3,
+        padding="same",
+        upsample_mode="nearest",)
+# TODO: fix valid padding error
+# TODO: Apply to one image to test that no errors happen
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
@@ -500,11 +467,16 @@ favorite_unet: UNet = unetA
 # ## Let's try the UNet!
 # We will get more into the details of training and evaluating semantic segmentation models in the next exercise. For now, we will provide an example pipeline that will train a UNet to classify each pixel in an image of cells as foreground or background.
 
-# %% [markdown]
-# TODO: add back in the data loaders (without augmentation) and
+# %%
+dataset = NucleiDataset("nuclei_train_data")
+for i in range(5):
+    show_random_dataset_image(dataset)
+
+# %%
+train_loader = DataLoader(dataset)
 
 # %% tags=["solution"]
-loss_function: torch.nn.Module = nn.BCELoss()
+loss_function: torch.nn.Module = torch.nn.BCELoss()
 
 
 # %% tags=["solution"]
@@ -597,7 +569,6 @@ def train(
 
 
 # %%
-simple_net = UNet(1, 1, depth=1, final_activation=nn.Sigmoid())
 
 train(
     simple_net,
