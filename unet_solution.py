@@ -49,14 +49,24 @@ assert torch.cuda.is_available()
 # ## The Components of a U-Net
 
 # %% [markdown]
-# The[U-Net](https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/) architecture has proven to outperform the other architectures in segmenting biological and medical images. It is also commonly used for other tasks that require the output to be the same resolution as the input, such as style transfer and denoising. Below is an overview figure of the U-Net architecture ([source](https://pythonawesome.com/u-net-architecture-for-multimodal-biomedical-image-segmentation/)). We will go through each of the components first (hint: all of them can be found in the list of PyTorch modules [here](https://pytorch.org/docs/stable/nn.html#convolution-layers)), and then fit them all together to make our very own U-Net.
+# The [U-Net](https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/) architecture has proven to outperform the other architectures in segmenting biological and medical images. It is also commonly used for other tasks that require the output to be the same resolution as the input, such as style transfer and denoising. Below is an overview figure of the U-Net architecture ([source](https://pythonawesome.com/u-net-architecture-for-multimodal-biomedical-image-segmentation/)). We will go through each of the components first (hint: all of them can be found in the list of PyTorch modules [here](https://pytorch.org/docs/stable/nn.html#convolution-layers)), and then fit them all together to make our very own U-Net.
 # ![image](static/unet-image.png)
 
 # %% [markdown]
 # ### Convolution Block
 
 # %% [markdown]
-# TODO: Explanation for pad computation (what is padding? what is valid/same? How to compute?)
+# A U-Net is a convolutional neural network, which means that the main type of operation is a convolution. Convolutions with defined kernels were covered briefly in the pre-course materials.
+#
+# <img src="./static/2D_Convolution_Animation.gif" width="400" height="300">
+
+
+# %% [markdown]
+# Shown here is a 3x3 kernel being convolved with an input array to get an output array of the same size. For each pixel of the input, the value at that same pixel of the output is computed by multiplying the kernel element-wise with the surrounding 3x3 neighborhood around the input pixel, and then summing the result.
+
+
+# %% [markdown]
+# You will notice that at the edges of the input, this animation shows greyed out values that extend past the input. This is known as padding the input. This example uses "same" padding, which means the values at the edges are repeated. The other option we will use in this exercise is "valid" padding, which essentially means no padding. In the case of valid padding, the output will be smaller than the input, as values at the edges of the output will not be computed. "Same" padding can introduce edge artifacts, but "valid" padding loses output size at every convolution.
 #
 # TODO: Explanation for conv_pass layers (links to docs)
 #
@@ -64,7 +74,6 @@ assert torch.cuda.is_available()
 
 
 # %%
-# target output can be somewhere between the unet.py implementation - but I suggest sticking with two convs, relu
 class ConvPass(torch.nn.Module):
     def __init__(
         self,
