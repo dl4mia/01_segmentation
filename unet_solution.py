@@ -57,8 +57,12 @@ assert torch.cuda.is_available()
 # ### Component 1: Upsampling
 
 # %% [markdown]
-# We will start by defining an upsampling module to use in our U-Net. The right side of the U-Net contains upsampling between the layers. There are many ways to upsample: in the example above, they use a 2x2 transposed convolution, but we will examine those upsampling methods implemented in [torch.nn.Upsample](https://pytorch.org/docs/stable/generated/torch.nn.Upsample.html#torch.nn.Upsample).
+# We will start with the Upsample module we will use in our U-Net. The right side of the U-Net contains upsampling between the layers. There are many ways to upsample: in the example above, they use a 2x2 transposed convolution, but we will use the PyTorch Upsample Module [torch.nn.Upsample](https://pytorch.org/docs/stable/generated/torch.nn.Upsample.html#torch.nn.Upsample).
 
+
+# %% [markdown]
+# #### Pytorch Modules
+# Modules are the building blocks of PyTorch models, and contain lots of magic that makes training models easy. If you aren't familiar with PyTorch modules, take a look at the official documentation [here](https://pytorch.org/docs/stable/notes/modules.html). For our purposes, it is crucial to note how Modules can have submodules defined in the `__init__` function, and how the `forward` function is defined and called.
 
 # %%
 # Here we make fake input to illustrate the upsampling techniques
@@ -71,67 +75,44 @@ sample_2d_input
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-# <b>Task 1.1:</b> Try out different upsampling techniques.
-#
-# Using the docs for [torch.nn.Upsample](https://pytorch.org/docs/stable/generated/torch.nn.Upsample.html#torch.nn.Upsample), try out a couple modes and scale factors in the cell below. Certain modes will only work with certain dimensional input, which is why we provide 1D and 2D above.
-# </div>
-# <b>Pytorch Note:</b> torch.nn.functional provides functions analagous to most common torch Modules. These are handy for testing a pytorch function outside of a neural network/Module, but should not be used inside torch Modules.
-
-# %%
-# See what happens if you vary the scale_factor and modes - you will need different dimensional
-# inputs for certain modes
-torch.nn.functional.upsample(sample_2d_input, scale_factor=2, mode="nearest")
-
-
-# %% [markdown]
-# <div class="alert alert-block alert-info">
-#     <b>Task 1.2:</b> Implement the Upsample Module
-#     <p>Now that you have tried some upsampling functions, it is time to build a pytorch Module that we can use to build our U-Net. Modules are the building blocks of pytorch models, and contain lots of magic that makes training models easy. You will need to do two things to implement the Upsample module.</p>
+#     <b>Task 1:</b> Try out different upsampling techniques
+#     <p>For our U-net, we will use the built-in PyTorch Upsample Module. Here we will practice declaring and calling an Upsample module with different parameters.</p>
 #     <ol>
-#         <li>Declare the Modules you want to use (in this case, <code>torch.nn.Upsample</code> with the correct arguments) in the <code>__init__</code> function.</li>
-#         <li>Call the modules in the forward function.</li>
+#         <li>Declare an instance of the pytorch Upsample module with scale_factor 2 and mode <code>"nearest"</code>. the Modules you want to use (in this case, <code>torch.nn.Upsample</code> with the correct arguments) in the <code>__init__</code> function.</li>
+#         <li>Call the module's forward function on the <code>sample_2d_input</code> to see what the nearest mode does.</li> 
+#         <li>Vary the scale factor and mode to see what changes. Check the documentation for possible modes and required input dimensions.</li>
 #     </ol>
 # </div>
 
 # %%
-class Upsample(torch.nn.Module):
-    def __init__(
-        self,
-        scale_factor: int,  # passed to torch.nn.Upsample
-        mode: str = "nearest",  # passed to torch.nn.Upsample
-    ):
-        """TODO: docstring"""
-        super(Upsample, self).__init__()
-        self.up = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)  # leave out
+up = torch.nn.Upsample(scale_factor=2, mode="nearest")  # 
+up(sample_2d_input)
 
-    def forward(self, x):
-        return self.up(x)  # leave out
-
+# %% [markdown]
+# Here is an additional example on image data.
 
 # %%
-up = Upsample(2)
+up = torch.nn.Upsample(scale_factor=2, mode="nearest")
 apply_and_show_random_image(up)
 
 # %% [markdown]
 # ### Component 2: Downsampling
 
 # %% [markdown]
-# Between each layer of the U-Net on the left side, there is a downsample step. Traditionally, this is done with a 2x2 max pooling operation : each 2x2 square of input values is replaced with the maximum value in the output. This results in an output that is half the size in each dimension. There are other ways to downsample, for example with average pooling, but we will stick with max pooling for this exercise.
-#
-#
+# Between each layer of the U-Net on the left side, there is a downsample step. Traditionally, this is done with a 2x2 max pooling operation. There are other ways to downsample, for example with average pooling, but we will stick with max pooling for this exercise.
 
-
-# %% [markdown]
-# <div class="alert alert-block alert-info">
-#     <b>Task 2.1:</b> Try out MaxPool downsampling
-#         <p>Using the docs for <a href=https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html>torch.nn.MaxPool2d</a>,
-#         try it out in function form in the cell below.
-#         </p>
-# </div>
 
 # %%
 sample_2d_input = torch.tensor(np.arange(16, dtype=np.float64).reshape((1,1,4,4)))
 sample_2d_input
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 2.1:</b> Try out max pooling
+#         <p>Using the docs for <a href=https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html>torch.nn.MaxPool2d</a>,
+#         try it out in function form in the cell below. Try varying the stride and the padding, to see how the output changes.
+#         </p>
+# <b>Pytorch Note:</b> torch.nn.functional provides functions analagous to most common torch Modules. These are handy for testing a pytorch function outside of a neural network/Module, but should not be used inside torch Modules.
 
 # %%
 torch.nn.functional.max_pool2d(sample_2d_input, kernel_size=2, stride=2, padding=0)
@@ -140,11 +121,10 @@ torch.nn.functional.max_pool2d(sample_2d_input, kernel_size=2, stride=2, padding
 # %% [markdown]
 # <div class="alert alert-block alert-info">
 #     <b>Task 2.2:</b> Implement a Downsample Module
-#         <p>While very similar to the Upsample Module, the downsample module has one additional componentThe downsample factor will be provided as an argument to the module, allowing you to customize how much you downsample at each layer. However, not every value can be used to downsample - if the downsample factor does not evenly divide the dimensions of the input to the layer, the Downsample module should throw an error.
-#         </p>
+#     <p>This is very similar to the built in MaxPool2D, but additionally has to check if the downsample factor matches in the input size. Note that we provide the forward function for you - in future Modules, you will implement the forward yourself.</p>
 #     <ol>
-#         <li>Declare the Modules you want to use (in this case, <code>torch.nn.MaxPool2D</code> with the correct arguments) in the <code>__init__</code> function.</li>
-#         <li>Write a function to check if the downsample factor is valid</li>
+#         <li>Declare the submodules you want to use (in this case, <code>torch.nn.MaxPool2D</code> with the correct arguments) in the <code>__init__</code> function. In our Downsample Module, we do not want to allow padding or strides other than the input kernel size.</li>
+#         <li>Write a function to check if the downsample factor is valid. If the downsample factor does not evenly divide the dimensions of the input to the layer, this function should return False.</li>
 #     </ol>
 # </div>
 
@@ -153,7 +133,7 @@ class Downsample(torch.nn.Module):
     def __init__(self, downsample_factor: int):
         """TODO: Docstring"""
 
-        super(Downsample, self).__init__()
+        super().__init__()
 
         self.downsample_factor = downsample_factor
 
@@ -185,7 +165,7 @@ down = Downsample(16)
 apply_and_show_random_image(down)
 
 # %% [markdown]
-# ### Convolution Block
+# ### Component 3: Convolution Block
 
 # %% [markdown]
 # #### Convolution
@@ -211,8 +191,16 @@ apply_and_show_random_image(down)
 # <img src="./static/ReLU.png" width="400" height="300">
 
 # %% [markdown]
-# #### Convolution block
-# The convolution block (ConvBlock) of a standard U-Net has two 3x3 convolutions, each of which is followed by a ReLU activation. Our implementation will handle other sizes of convolutions as well. The first convolution in the block will handle changing the input number of feature maps/channels into the output, and the second convolution will have the same number of feature maps in and out. You will use [torch.nn.Conv2D](https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html#torch.nn.Conv2d) and [torch.nn.ReLU](https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU) to implement the ConvBlock below.
+# <div class="alert alert-block alert-info">
+#     <b>Task 3:</b> Implement a ConvBlock module
+#     <p>The convolution block (ConvBlock) of a standard U-Net has two 3x3 convolutions, each of which is followed by a ReLU activation. Our implementation will handle other sizes of convolutions as well. The first convolution in the block will handle changing the input number of feature maps/channels into the output, and the second convolution will have the same number of feature maps in and out.</p>
+#     <ol>
+#         <li>Declare the submodules you want to use in the <code>__init__</code> function. Because you will always be calling four submodules in sequence (<a href=https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html#torch.nn.Conv2d>torch.nn.Conv2D</a>, <a href=https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU>torch.nn.ReLU</a>, Conv2D, ReLU), you can use <a href=https://pytorch.org/docs/stable/generated/torch.nn.Sequential.html>torch.nn.Sequential</a> to hold the convolutions and ReLUs.</li>
+#         <li>Call the modules in the forward function. If you used <code>torch.nn.Sequential</code> in step 1, you only need to call the Sequential module, but if not, you can call the Conv2D and ReLU Modules explicitly.</li>
+#     </ol>
+# </div>
+#
+# If you get stuck, refer back to the <a href=https://pytorch.org/docs/stable/notes/modules.html>Module</a> documentation for hints and examples of how to define a PyTorch Module. 
 
 
 # %%
@@ -234,7 +222,7 @@ class ConvBlock(torch.nn.Module):
             kernel_size (int): The size of the kernel. A kernel size of N signifies an
                 NxN square kernel.
         """
-        super(ConvPass, self).__init__()
+        super().__init__()
 
         # determine padding size based on method
         if padding in ("VALID", "valid"):
@@ -298,17 +286,22 @@ apply_and_show_random_image(conv)
 
 
 # %% [markdown]
-# ### Skip Connections and Concatenation
+# ### Component 4: Skip Connections and Concatenation
 
 # %% [markdown]
 # The skip connections between the left and right side of the U-Net are central to successfully obtaining high-resolution output. At each layer, the output of the left conv block is concatenated to the output of the upsample block on the right side from the last layer below. Since upsampling, especially with the "nearest" algorithm, does not actually add high resolution information, the concatenation of the right side conv block output is crucial to generate high resolution segmentations.
 #
 # If the convolutions in the U-Net are valid, the right side will be smaller than the left side, so the right side output must be cropped before concatenation. We provide a helper function to do this cropping. 
 #
-# Below, you must implement the forward algorithm, including the cropping (using the provided helper function) and the concatenation (using [torch.cat](https://pytorch.org/docs/stable/generated/torch.cat.html#torch.cat)).
-#
 # TODO: Add test
 
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 4:</b> Implement a CropAndConcat module
+#     <p>Below, you must implement the forward algorithm, including the cropping (using the provided helper function <code>self.crop</code>) and the concatenation (using <a href=https://pytorch.org/docs/stable/generated/torch.cat.html#torch.cat>torch.cat</a>).
+# </p>
+# </div>
 
 # %%
 class CropAndConcat(torch.nn.Module):
@@ -331,13 +324,20 @@ class CropAndConcat(torch.nn.Module):
 
 
 # %% [markdown]
-# ### Output Block
+# ### Component 5: Output Block
 
 # %% [markdown]
-# Create a final block for outputting what you want for your class. Different than normal conv block
-#
-# TODO: explanation, test
+# The final block we need to write for our U-Net is the output convolution block. The exact format of output you want depends on your task, so our U-Net must be flexible enough to handle different numbers of out channels and different final activation functions.
 
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 5:</b> Implement an OutputConv Module
+#     <ol>
+#         <li>Define the convolution and final activation module in the <code>__init__</code> function. You can use a convolution with kernel size 1 to get the appropriate number of output channels.</li>
+#         <li>Call the final convolution and activation modules in the <code>forward</code> function</li>
+#     </ol>
+# </div>
 
 # %%
 class OutputConv(torch.nn.Module):
@@ -350,20 +350,26 @@ class OutputConv(torch.nn.Module):
         ] = None,  # Accepts the name of any torch activation function (e.g., ``ReLU`` for ``torch.nn.ReLU``).
     ):
         """
-        Use a convolution with kernel size 1 to obtain the appropriate number of output channels. Then apply final activation.
-
+        Use a convolution with kernel size 1 to obtain the appropriate number of output channels. 
+        Then apply final activation.
         """
         super().__init__()
-        conv = torch.nn.Conv2d(in_channels, out_channels, 1, padding=0)
-        if activation is not None:
-            activation = getattr(torch.nn, activation)
-            self.final_conv = torch.nn.Sequential[conv, activation]
+        self.final_conv = torch.nn.Conv2d(in_channels, out_channels, 1, padding=0) # leave this out
+        if activation is None:
+            self.activation = None
         else:
-            self.final_conv = conv
+            self.activation = getattr(torch.nn, activation)()
 
     def forward(self, x):
-        return self.final_conv(x)
+        x = self.final_conv(x)
+        if self.activation is not None:
+            x = self.activation(x)
+        return x
 
+
+# %%
+out_conv = OutputConv(in_channels=1, out_channels=1, activation="ReLU")
+apply_and_show_random_image(out_conv)
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
@@ -393,8 +399,6 @@ class OutputConv(torch.nn.Module):
 # TODO: Finish cleaning up this UNet to match our defined solutions above. Then, decide which parts they should implement.
 
 # %%
-
-
 class UNet(torch.nn.Module):
     def __init__(
         self,
@@ -452,7 +456,7 @@ class UNet(torch.nn.Module):
                 How many output channels you want. Depends on your task. Defaults to 1.
         """
 
-        super(UNet, self).__init__()
+        super().__init__()
 
         self.depth = depth
         self.in_channels = in_channels
@@ -467,35 +471,32 @@ class UNet(torch.nn.Module):
         self.out_channels = out_channels
 
         # left convolutional passes
-        self.l_conv = torch.nn.ModuleList()
+        self.left_convs = torch.nn.ModuleList()
         for level in range(self.depth):
+            print(f"{level=}")
             fmaps_in, fmaps_out = self.compute_fmaps_encoder(level)
-            self.l_conv.append(
-                ConvBlock(fmaps_in, fmaps_out, self.kernel_size, self.padding)
+            print(f"{fmaps_in=} {fmaps_out=}")
+            self.left_convs.append(
+                ConvBlock(fmaps_in, fmaps_out, self.kernel_size, self.padding) # leave out
             )
+        
+        # left downsampling passes
+        self.downsample = Downsample(self.downsample_factor)
 
-        self.l_down = torch.nn.ModuleList()
-        for level in range(self.depth - 1):
-            self.l_down.append(Downsample(self.downsample_factor))
-
-        # right up/crop/concatenate layers
-        self.r_up = torch.nn.ModuleList()
-        for level in range(self.depth - 1):
-            self.r_up.append(
-                Upsample(
-                    downsample_factor,
+        # right upsampling passes
+        self.upsample = torch.nn.Upsample(
+                    scale_factor=self.downsample_factor,
                     mode=self.upsample_mode,
                 )
-            )
-        self.crop_up = torch.nn.ModuleList()
-        for level in range(self.depth - 1):
-            self.crop_up.append(CropAndConcat())
+
+        # cropping and concatenating modules
+        self.crop_and_concat = CropAndConcat()
 
         # right convolutional passes
-        self.r_conv = torch.nn.ModuleList()
+        self.right_convs = torch.nn.ModuleList()
         for level in range(self.depth - 1):
             fmaps_in, fmaps_out = self.compute_fmaps_decode(level)
-            self.r_conv.append(
+            self.right_convs.append(
                 ConvPass(
                     fmaps_in,
                     fmaps_out,
@@ -503,6 +504,7 @@ class UNet(torch.nn.Module):
                     self.padding,
                 )
             )
+
         self.final_conv = OutputConv(
             self.compute_fmaps_decode(0)[1], self.out_channels, self.final_activation
         )
@@ -511,7 +513,7 @@ class UNet(torch.nn.Module):
         """Compute the number of input and output feature maps for a conv block at a given level
         of the UNet encoder. TODO: add args, output
         """
-        if level == 0:
+        if level == 0:  # Leave out function
             fmaps_in = self.in_channels
         else:
             fmaps_in = self.num_fmaps * self.fmap_inc_factor ** (level - 1)
@@ -523,7 +525,7 @@ class UNet(torch.nn.Module):
         """Compute the number of input and output feature maps for a conv block at a given level
         of the UNet decoder. TODO: add args, output
         """
-        fmaps_out = self.num_fmaps * self.fmap_inc_factor ** (level)
+        fmaps_out = self.num_fmaps * self.fmap_inc_factor ** (level)  # Leave out function
         concat_fmaps = self.compute_fmaps_encoder(level)[
             1
         ]  # The channels that come from the skip connection
@@ -531,36 +533,29 @@ class UNet(torch.nn.Module):
 
         return fmaps_in, fmaps_out
 
-    def rec_forward(self, level, f_in):
-
-        # index of level in layer arrays
-        i = self.depth - level - 1
-
-        # convolve
-        f_left = self.l_conv[i](f_in)
-
-        # end of recursion
-        if level == 0:
-            fs_out = f_left
-        else:
-            # down
-            g_in = self.l_down[i](f_left)
-            # nested levels
-            gs_out = self.rec_forward(level - 1, g_in)
-            # up, concat, and crop
-            f_up = self.r_up[i](gs_out)
-            fs_right = self.crop_up[i](f_left, f_up)
-
-            # convolve
-            fs_out = self.r_conv[i](fs_right)
-
-        return fs_out
-
     def forward(self, x):
+        # left side
+        convolution_outputs = []
+        layer_input = x
+        for i in range(self.depth - 1):  # leave out center of for loop
+            conv_out = self.left_convs[i](layer_input)
+            convolution_outputs.append(conv_out)
+            downsampled = self.downsample(conv_out)
+            layer_input = downsampled
 
-        y = self.rec_forward(self.depth - 1, x)
+        # bottom
+        conv_out = self.left_convs[-1](layer_input)
+        layer_input = conv_out
 
-        return self.final_conv(y)
+        # right
+        for i in range(0, self.depth-1)[::-1]:  # leave out center of for loop
+            print(f"right layer {i}")
+            upsampled = self.upsample(layer_input)
+            concat = self.crop_and_concat(convolution_outputs[i], upsampled)
+            conv_output = self.right_convs[i](concat)
+            layer_input = conv_output
+
+        return self.final_conv(layer_input)
 
 
 # %%
@@ -571,10 +566,13 @@ simple_net = UNet(
         fmap_inc_factor=3,
         downsample_factor=2,
         kernel_size=3,
-        padding="same",
+        padding="valid",
         upsample_mode="nearest",)
 # TODO: fix valid padding error
 # TODO: Apply to one image to test that no errors happen
+
+# %%
+apply_and_show_random_image(simple_net)
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
@@ -750,217 +748,3 @@ for epoch in range(n_epochs):
 #
 # </div>
 # <hr style="height:2px;">
-
-# %% [markdown]
-# ## Additional Exercises
-#
-# 1. Modify and evaluate the following architecture variants of the U-Net:
-#     * use [GroupNorm](https://pytorch.org/docs/stable/nn.html#torch.nn.GroupNorm) to normalize convolutional group inputs
-#     * use more layers in your U-Net.
-#
-# 2. Use the Dice Coefficient as loss function. Before we only used it for validation, but it is differentiable and can thus also be used as loss. Compare to the results from exercise 2.
-# Hint: The optimizer we use finds minima of the loss, but the minimal value for the Dice coefficient corresponds to a bad segmentation. How do we need to change the Dice Coefficient to use it as loss nonetheless?
-#
-# 3. Compare the results of these trainings to the first one. If any of the modifications you've implemented show better results, combine them (e.g. add both GroupNorm and one more layer) and run trainings again.
-# What is the best result you could get?
-
-# %% [markdown]
-#
-# <div class="alert alert-block alert-info">
-#     <b>Task BONUS 4.1</b>: Group Norm, update the U-Net to use a GroupNorm layer
-# </div>
-
-
-# %%
-class UNetGN(UNet):
-    """
-    A subclass of UNet that implements GroupNorm in each convolutional block
-    """
-
-    # Convolutional block for single layer of the decoder / encoder
-    # we apply two 2d convolutions with relu activation
-    def _conv_block(self, in_channels, out_channels):
-        # See the original U-Net for an example of how to build the convolutional block
-        # We want operation -> activation -> normalization (2x)
-        # Hint: Group norm takes a "num_groups" argument. Use 8 to match the solution
-        return ...
-
-
-# %% tags=["solution"]
-class UNetGN(UNet):
-    """
-    A subclass of UNet that implements GroupNorm in each convolutional block
-    """
-
-    # Convolutional block for single layer of the decoder / encoder
-    # we apply two 2d convolutions with relu activation
-    def _conv_block(self, in_channels, out_channels):
-        return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.GroupNorm(8, out_channels),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.GroupNorm(8, out_channels),
-        )
-
-
-# %%
-model = UNetGN(1, 1, final_activation=nn.Sigmoid())
-
-optimizer = torch.optim.Adam(model.parameters())
-
-metric = DiceCoefficient()
-
-logger = SummaryWriter("runs/UNetGN")
-
-
-# train for 40 epochs
-# during the training you can inspect the
-# predictions in the tensorboard
-n_epochs = 40
-for epoch in range(n_epochs):
-    train(
-        model,
-        train_loader,
-        optimizer=optimizer,
-        loss_function=loss_function,
-        epoch=epoch,
-        log_interval=5,
-        tb_logger=logger,
-    )
-    step = epoch * num_train_pairs
-    validate(model, val_loader, loss_function, metric, step=step, tb_logger=logger)
-
-
-# %% [markdown]
-# <div class="alert alert-block alert-info">
-#     <b>Task BONUS 4.2</b>: More Layers
-# </div>
-
-# %%
-# Experiment with more layers. For example UNet with depth 5
-
-model = ...
-
-optimizer = torch.optim.Adam(model.parameters())
-
-metric = DiceCoefficient()
-
-loss = torch.nn.BCELoss()
-
-logger = SummaryWriter("runs/UNet5layers")
-
-# %% tags=["solution"]
-# Experiment with more layers. For example UNet with depth 5
-
-model = UNet(1, 1, depth=5, final_activation=nn.Sigmoid())
-
-optimizer = torch.optim.Adam(model.parameters())
-
-metric = DiceCoefficient()
-
-loss = torch.nn.BCELoss()
-
-logger = SummaryWriter("runs/UNet5layers")
-
-# %%
-# train for 25 epochs
-# during the training you can inspect the
-# predictions in the tensorboard
-n_epochs = 25
-for epoch in range(n_epochs):
-    train(
-        model,
-        train_loader,
-        optimizer=optimizer,
-        loss_function=loss,
-        epoch=epoch,
-        log_interval=5,
-        tb_logger=logger,
-    )
-    step = epoch * num_train_pairs
-    validate(model, val_loader, loss, metric, step=step, tb_logger=logger)
-
-
-# %% [markdown]
-# <div class="alert alert-block alert-info">
-#     <b>Task BONUS 4.3</b>: Dice Loss
-#     Dice Loss is a simple inversion of the Dice Coefficient.
-#     We already have a Dice Coefficient implementation, so now we just
-#     need a layer that can invert it.
-# </div>
-
-
-# %%
-class DiceLoss(nn.Module):
-    """ """
-
-    def __init__(self, offset: float = 1):
-        super().__init__()
-        self.dice_coefficient = DiceCoefficient()
-
-    def forward(self, x, y): ...
-
-
-# %% tags=["solution"]
-class DiceLoss(nn.Module):
-    """
-    This layer will simply compute the dice coefficient and then negate
-    it with an optional offset.
-    We support an optional offset because it is common to have 0 as
-    the optimal loss. Since the optimal dice coefficient is 1, it is
-    convenient to get 1 - dice_coefficient as our loss.
-
-    You could leave off the offset and simply have -1 as your optimal loss.
-    """
-
-    def __init__(self, offset: float = 1):
-        super().__init__()
-        self.offset = torch.nn.Parameter(torch.tensor(offset), requires_grad=False)
-        self.dice_coefficient = DiceCoefficient()
-
-    def forward(self, x, y):
-        coefficient = self.dice_coefficient(x, y)
-        return self.offset - coefficient
-
-
-# %%
-# Now combine the Dice Coefficient layer with the Invert layer to make a Dice Loss
-dice_loss = ...
-
-
-# %% tags=["solution"]
-# Now combine the Dice Coefficient layer with the Invert layer to make a Dice Loss
-dice_loss = DiceLoss()
-
-# %%
-# Experiment with Dice Loss
-net = ...
-optimizer = ...
-metric = ...
-loss_func = ...
-
-# %% tags=["solution"]
-# Experiment with Dice Loss
-net = UNet(1, 1, final_activation=nn.Sigmoid())
-optimizer = torch.optim.Adam(net.parameters())
-metric = DiceCoefficient()
-loss_func = dice_loss
-
-# %%
-logger = SummaryWriter("runs/UNet_diceloss")
-
-n_epochs = 40
-for epoch in range(n_epochs):
-    train(
-        net,
-        train_loader,
-        optimizer=optimizer,
-        loss_function=loss_func,
-        epoch=epoch,
-        log_interval=5,
-        tb_logger=logger,
-    )
-    step = epoch * num_train_pairs
-    validate(net, val_loader, loss_func, metric, step=step, tb_logger=logger)
