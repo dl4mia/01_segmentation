@@ -54,6 +54,137 @@ assert torch.cuda.is_available()
 # ![image](static/unet-image.png)
 
 # %% [markdown]
+# ### Component 1: Upsampling
+
+# %% [markdown]
+# We will start by defining an upsampling module to use in our U-Net. The right side of the U-Net contains upsampling between the layers. There are many ways to upsample: in the example above, they use a 2x2 transposed convolution, but we will examine those upsampling methods implemented in [torch.nn.Upsample](https://pytorch.org/docs/stable/generated/torch.nn.Upsample.html#torch.nn.Upsample).
+
+
+# %%
+# Here we make fake input to illustrate the upsampling techniques
+# Pytorch expects a batch and channel dimension before the actual data,
+# So this simulates a 1D input
+sample_1d_input = torch.tensor([[[1,2,3,4]]], dtype=torch.float64)
+# And this simulates a 2D input
+sample_2d_input = torch.tensor([[[[1,2,],[3,4]]]], dtype=torch.float64)
+sample_2d_input
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+# <b>Task 1.1:</b> Try out different upsampling techniques.
+#
+# Using the docs for [torch.nn.Upsample](https://pytorch.org/docs/stable/generated/torch.nn.Upsample.html#torch.nn.Upsample), try out a couple modes and scale factors in the cell below. Certain modes will only work with certain dimensional input, which is why we provide 1D and 2D above.
+# </div>
+# <b>Pytorch Note:</b> torch.nn.functional provides functions analagous to most common torch Modules. These are handy for testing a pytorch function outside of a neural network/Module, but should not be used inside torch Modules.
+
+# %%
+# See what happens if you vary the scale_factor and modes - you will need different dimensional
+# inputs for certain modes
+torch.nn.functional.upsample(sample_2d_input, scale_factor=2, mode="nearest")
+
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 1.2:</b> Implement the Upsample Module
+#     <p>Now that you have tried some upsampling functions, it is time to build a pytorch Module that we can use to build our U-Net. Modules are the building blocks of pytorch models, and contain lots of magic that makes training models easy. You will need to do two things to implement the Upsample module.</p>
+#     <ol>
+#         <li>Declare the Modules you want to use (in this case, <code>torch.nn.Upsample</code> with the correct arguments) in the <code>__init__</code> function.</li>
+#         <li>Call the modules in the forward function.</li>
+#     </ol>
+# </div>
+
+# %%
+class Upsample(torch.nn.Module):
+    def __init__(
+        self,
+        scale_factor: int,  # passed to torch.nn.Upsample
+        mode: str = "nearest",  # passed to torch.nn.Upsample
+    ):
+        """TODO: docstring"""
+        super(Upsample, self).__init__()
+        self.up = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)  # leave out
+
+    def forward(self, x):
+        return self.up(x)  # leave out
+
+
+# %%
+up = Upsample(2)
+apply_and_show_random_image(up)
+
+# %% [markdown]
+# ### Component 2: Downsampling
+
+# %% [markdown]
+# Between each layer of the U-Net on the left side, there is a downsample step. Traditionally, this is done with a 2x2 max pooling operation : each 2x2 square of input values is replaced with the maximum value in the output. This results in an output that is half the size in each dimension. There are other ways to downsample, for example with average pooling, but we will stick with max pooling for this exercise.
+#
+#
+
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 2.1:</b> Try out MaxPool downsampling
+#         <p>Using the docs for <a href=https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html>torch.nn.MaxPool2d</a>,
+#         try it out in function form in the cell below.
+#         </p>
+# </div>
+
+# %%
+sample_2d_input = torch.tensor(np.arange(16, dtype=np.float64).reshape((1,1,4,4)))
+sample_2d_input
+
+# %%
+torch.nn.functional.max_pool2d(sample_2d_input, kernel_size=2, stride=2, padding=0)
+
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 2.2:</b> Implement a Downsample Module
+#         <p>While very similar to the Upsample Module, the downsample module has one additional componentThe downsample factor will be provided as an argument to the module, allowing you to customize how much you downsample at each layer. However, not every value can be used to downsample - if the downsample factor does not evenly divide the dimensions of the input to the layer, the Downsample module should throw an error.
+#         </p>
+#     <ol>
+#         <li>Declare the Modules you want to use (in this case, <code>torch.nn.MaxPool2D</code> with the correct arguments) in the <code>__init__</code> function.</li>
+#         <li>Write a function to check if the downsample factor is valid</li>
+#     </ol>
+# </div>
+
+# %%
+class Downsample(torch.nn.Module):
+    def __init__(self, downsample_factor: int):
+        """TODO: Docstring"""
+
+        super(Downsample, self).__init__()
+
+        self.downsample_factor = downsample_factor
+
+        self.down = torch.nn.MaxPool2d(
+            downsample_factor
+        )  # leave out
+
+    def check_valid(self, image_size: tuple[int, int]) -> bool:
+        """Check if the downsample factor evenly divides each image dimension
+        Note: there are multiple ways to do this!
+        """
+        for dim in image_size:
+            if dim % self.downsample_factor != 0:  # Leave out whole implementation
+                return False
+        return True
+
+    def forward(self, x):
+        if not self.check_valid(tuple(x.size()[-2:])):
+            raise RuntimeError(
+                "Can not downsample shape %s with factor %s"
+                % (x.size(), self.downsample_factor)
+            )
+
+        return self.down(x)
+
+
+# %%
+down = Downsample(16)
+apply_and_show_random_image(down)
+
+# %% [markdown]
 # ### Convolution Block
 
 # %% [markdown]
@@ -167,100 +298,14 @@ apply_and_show_random_image(conv)
 
 
 # %% [markdown]
-# ### Downsampling / Max Pooling
-
-# %% [markdown]
-# Between each layer of the U-Net on the left side, there is a downsample step. Traditionally, this is done with a 2x2 max pooling operation : each 2x2 square of input values is replaced with the maximum value in the output. This results in an output that is half the size in each dimension. There are other ways to downsample, for example with average pooling, but we will stick with max pooling for this exercise.
-#
-# Below, you will implement a Downsample model using [torch.nn.MaxPool2D](https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html). The downsample factor will be provided as an argument to the module, allowing you to customize how much you downsample at each layer. However, not every value can be used to downsample - if the downsample factor does not evenly divide the dimensions of the input to the layer, the Downsample module should throw an error.
-
-
-# %%
-class Downsample(torch.nn.Module):
-    def __init__(self, downsample_factor: int):
-        """TODO: Docstring"""
-
-        super(Downsample, self).__init__()
-
-        self.downsample_factor = downsample_factor
-
-        self.down = torch.nn.MaxPool2d(
-            downsample_factor
-        )  # leave out
-
-    def check_valid(self, image_size: tuple[int, int]) -> bool:
-        """Check if the downsample factor evenly divides each image dimension
-        Note: there are multiple ways to do this!
-        """
-        for dim in image_size:
-            if dim % self.downsample_factor != 0:  # Leave out whole implementation
-                return False
-        return True
-
-    def forward(self, x):
-        if not self.check_valid(tuple(x.size()[-2:])):
-            raise RuntimeError(
-                "Can not downsample shape %s with factor %s"
-                % (x.size(), self.downsample_factor)
-            )
-
-        return self.down(x)
-
-
-# %%
-down = Downsample(16)
-apply_and_show_random_image(down)
-
-# %% [markdown]
-# ### Upsampling
-
-# %% [markdown]
-# The right side of the U-Net contains upsampling between the layers. There are many ways to upsample: we will examine those implemented in [torch.nn.Upsample](https://pytorch.org/docs/stable/generated/torch.nn.Upsample.html#torch.nn.Upsample).
-
-
-# %%
-# First, we make fake input to illustrate the upsampling techniques
-# Pytorch expects a batch and channel dimension before the actual data,
-# So this simulates a 1D input
-sample_1d_input = torch.tensor([[[1,2,3,4]]], dtype=torch.float64)
-# And this simulates a 2D input
-sample_2d_input = torch.tensor([[[[1,2,],[3,4]]]], dtype=torch.float64)
-sample_2d_input
-
-# %%
-# See what happens if you vary the scale_factor and modes - you will need different dimensional
-# inputs for certain modes
-torch.nn.functional.upsample(sample_2d_input, scale_factor=2, mode="bicubic")
-# Note: To test a pytorch function outside of a module, you can use torch.nn.functional.upsample
-# However, when you use it inside a module, just use torch.nn.Upsample
-
-# %% [markdown]
-# Now we will implement our Upsample module. The scale factor and mode will the passed as arguments to the module, and you should pass these along to [torch.nn.Upsample](https://pytorch.org/docs/stable/generated/torch.nn.Upsample.html#torch.nn.Upsample).
-
-# %%
-class Upsample(torch.nn.Module):
-    def __init__(
-        self,
-        scale_factor: int,  # passed to torch.nn.Upsample
-        mode: str = "nearest",  # passed to torch.nn.Upsample
-    ):
-        """TODO: docstring"""
-        super(Upsample, self).__init__()
-        self.up = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)  # leave out
-
-    def forward(self, x):
-        return self.up(x)  # leave out
-
-
-# %%
-up = Upsample(2)
-apply_and_show_random_image(up)
-
-# %% [markdown]
 # ### Skip Connections and Concatenation
 
 # %% [markdown]
-# TODO: Add explanation
+# The skip connections between the left and right side of the U-Net are central to successfully obtaining high-resolution output. At each layer, the output of the left conv block is concatenated to the output of the upsample block on the right side from the last layer below. Since upsampling, especially with the "nearest" algorithm, does not actually add high resolution information, the concatenation of the right side conv block output is crucial to generate high resolution segmentations.
+#
+# If the convolutions in the U-Net are valid, the right side will be smaller than the left side, so the right side output must be cropped before concatenation. We provide a helper function to do this cropping. 
+#
+# Below, you must implement the forward algorithm, including the cropping (using the provided helper function) and the concatenation (using [torch.cat](https://pytorch.org/docs/stable/generated/torch.cat.html#torch.cat)).
 #
 # TODO: Add test
 
