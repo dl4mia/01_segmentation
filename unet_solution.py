@@ -13,21 +13,13 @@
 # </div>
 
 # %% [markdown]
-# Proposed outline of exercise:
-# 1. Go through each component (convolution block, max pooling, transposed convolution, sigmoid, skip connection and concatenation), "implement", and verify on a small example.
-# 2. Put these together into a U-Net model with arguments controlling the presence or number of each. Test on a small example (data provided).
-# 3. Train with various configurations, similar to Will's exercise below, but with actually training multiple configurations (e.g. with and without skip connections), and visually inspect training samples in tensorboard. Use semantic segmentation on kaggle dataset with provided training and no validation, no augmentation, and no quantiative metrics (leave these for actual semantic segmentation exercise.
-
-# %% [markdown]
 # TODOS:
-# - Fix display function to be centered and know which is smaller and move to imports
 # - Test for crop and concat
 # - Test shape of outputs for different blocks
 # - Better explain unet implementation where each element of list is a layer (good scaffolding)
 # - Create solution tags and empty scaffolding
 # - Introduce dataset and segmentation in one cell
 # - Better training tasks
-# - Receptive field visualization?
 
 # %% [markdown]
 # <hr style="height:2px;">
@@ -389,6 +381,14 @@ apply_and_show_random_image(out_conv)
 # Now we will make a U-Net class that combines all of these components as shown in the image. This image shows a U-Net of depth 5 with specific input channels, feature maps, upsampling, and final activation. Ours will be configurable with regards to depth and other features.
 # ![image](static/UNet_figure.png)
 
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 6:</b> U-Net Implementation
+#     <ol>
+#         <li>TODO: list what they need to implement specifically</li>
+#         </ol>
+# </div>
 
 # %%
 class UNet(torch.nn.Module):
