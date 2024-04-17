@@ -565,7 +565,6 @@ simple_net = UNet(
         kernel_size=3,
         padding="valid",
         upsample_mode="nearest",)
-# TODO: fix valid padding error
 
 # %%
 apply_and_show_random_image(simple_net)
@@ -605,8 +604,13 @@ plot_receptive_field(new_net)
 # <hr style="height:2px;">
 
 # %% [markdown]
-# ## Let's try the UNet!
-# We will get more into the details of evaluating semantic segmentation models in the next exercise. For now, we will provide an example pipeline that will train a UNet to classify each pixel in an image of cells as foreground or background.
+# ## Train a U-Net!
+# We will get more into the details of evaluating semantic segmentation models in the next exercise. For now, we will provide an example pipeline that will train a U-Net to classify each pixel in an image of cells as foreground or background.
+
+# %% [markdown]
+# ### Dataset
+# For our segmentation exercises, we will be using a nucleus segmentation dataset from [Kaggle 2018 Data Science Bowl](https://www.kaggle.com/c/data-science-bowl-2018/data). We have pre-downloaded the dataset to the shared drive and provded a pytorch Dataset called `NucleiDataset` to use for training. In this exercise, we will do semantic segmentation and train a model to classify foreground and background, but you will learn more about this task in the next exercise.
+# Below, we visualize five examples of input data and foreground mask.
 
 # %%
 from torchvision import transforms
@@ -619,7 +623,7 @@ for i in range(5):
 train_loader = DataLoader(dataset)
 
 # %% tags=["solution"]
-loss_function: torch.nn.Module = torch.nn.BCELoss()
+loss_function: torch.nn.Module = torch.nn.MSELoss()
 
 
 # %% tags=["solution"]
@@ -633,6 +637,7 @@ def crop(x, target):
     slices = tuple(slice(o, o + s) for o, s in zip(offset, x_target_size))
 
     return x[slices]
+    
 # apply training for one epoch
 def train(
     model,
@@ -716,26 +721,6 @@ def train(
             break
 
 
-# %% [markdown]
-# <div class="alert alert-block alert-warning">
-#     Quick sanity check for your train function to make sure no errors are thrown:
-#     Good place to test unetA, unetB, unetC, unetD to see if you can eliminate some
-# </div>
-
-
-# %%
-
-train(
-    simple_net,
-    train_loader,
-    optimizer=torch.optim.Adam(simple_net.parameters()),
-    loss_function=torch.nn.MSELoss(),
-    epoch=0,
-    log_interval=1,
-    early_stop=True,
-)
-
-
 # %%
 # start a tensorboard writer
 logger = SummaryWriter("runs/Unet")
@@ -744,7 +729,8 @@ logger = SummaryWriter("runs/Unet")
 # %%
 # Here is where students can define their own unet with whatever parameters they want to try,
 # or use one of the examples from the thought exercise
-model = UNet(...)
+model = UNet(depth=4,
+        in_channels=1)
 
 # %%
 # use adam optimizer
@@ -762,7 +748,6 @@ for epoch in range(n_epochs):
         optimizer=optimizer,
         loss_function=loss_function,
         epoch=epoch,
-        log_interval=5,
         tb_logger=logger,
     )
 
