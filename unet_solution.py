@@ -229,16 +229,18 @@ class ConvBlock(torch.nn.Module):
                 NxN square kernel.
         """
         super().__init__()
-        self.kernel_size = kernel_size
-        self.padding = padding.upper()
-        
+
+        if kernel_size % 2 == 0:
+            msg = "Only allowing odd kernel sizes."
+            raise ValueError(msg)
         # determine padding size based on method
-        if self.padding == "VALID":
+        if padding.upper() == "VALID":
             pad = 0  # compute this
-        elif self.padding == "SAME":
-            pad = self.kernel_size // 2  # compute this
+        elif padding.upper() == "SAME":
+            pad = kernel_size // 2  # compute this
         else:
-            raise RuntimeError("invalid string value for padding")
+            msg = "invalid string value for padding. Choose SAME or VALID."
+            raise ValueError(msg)
 
         # define layers in conv pass
         self.conv_pass = torch.nn.Sequential(
@@ -266,7 +268,7 @@ class ConvBlock(torch.nn.Module):
 
 # %%
 torch.manual_seed(26)
-conv = ConvBlock(1,2,4,"same")
+conv = ConvBlock(1,2,5,"same")
 apply_and_show_random_image(conv)
 
 
