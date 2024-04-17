@@ -49,6 +49,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 from typing import Optional
 from local import NucleiDataset, show_random_dataset_image, train, apply_and_show_random_image
+import unet_tests
 
 # %%
 # make sure gpu is available. Please call a TA if this cell fails
@@ -96,14 +97,13 @@ sample_2d_input
 # </div>
 
 # %%
-up = torch.nn.Upsample(scale_factor=2, mode="nearest")   
+up = torch.nn.Upsample(scale_factor=2, mode="nearest")   # need to keep scaffolding for up here
 up(sample_2d_input)
 
 # %% [markdown]
 # Here is an additional example on image data.
 
 # %%
-up = torch.nn.Upsample(scale_factor=2, mode="nearest")
 apply_and_show_random_image(up)
 
 # %% [markdown]
@@ -175,6 +175,9 @@ class Downsample(torch.nn.Module):
 down = Downsample(16)
 apply_and_show_random_image(down)
 
+# %%
+unet_tests.TestDown(Downsample).run()
+
 # %% [markdown]
 # ### Component 3: Convolution Block
 
@@ -234,12 +237,14 @@ class ConvBlock(torch.nn.Module):
                 NxN square kernel.
         """
         super().__init__()
-
+        self.kernel_size = kernel_size
+        self.padding = padding.upper()
+        
         # determine padding size based on method
-        if padding in ("VALID", "valid"):
+        if self.padding == "VALID":
             pad = 0  # compute this
-        elif padding in ("SAME", "same"):
-            pad = kernel_size // 2  # compute this
+        elif self.padding == "SAME":
+            pad = self.kernel_size // 2  # compute this
         else:
             raise RuntimeError("invalid string value for padding")
 
@@ -269,9 +274,12 @@ class ConvBlock(torch.nn.Module):
 
 # %%
 torch.manual_seed(26)
-conv = ConvBlock(1,2,3,"valid")
+conv = ConvBlock(1,2,4,"same")
 apply_and_show_random_image(conv)
 
+
+# %%
+unet_tests.TestConvBlock(ConvBlock).run()
 
 # %% [markdown]
 # ### Component 4: Skip Connections and Concatenation
