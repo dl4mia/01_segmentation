@@ -604,10 +604,12 @@ plot_receptive_field(new_net)
 
 # %% [markdown]
 # ## Let's try the UNet!
-# We will get more into the details of training and evaluating semantic segmentation models in the next exercise. For now, we will provide an example pipeline that will train a UNet to classify each pixel in an image of cells as foreground or background.
+# We will get more into the details of evaluating semantic segmentation models in the next exercise. For now, we will provide an example pipeline that will train a UNet to classify each pixel in an image of cells as foreground or background.
 
 # %%
-dataset = NucleiDataset("nuclei_train_data")
+from torchvision import transforms
+
+dataset = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
 for i in range(5):
     show_random_dataset_image(dataset)
 
@@ -619,6 +621,16 @@ loss_function: torch.nn.Module = torch.nn.BCELoss()
 
 
 # %% tags=["solution"]
+def crop(x, target):
+    """Center-crop x to match spatial dimensions given by target."""
+
+    x_target_size = x.size()[:-2] + target.size()[-2:]
+
+    offset = tuple((a - b) // 2 for a, b in zip(x.size(), x_target_size))
+
+    slices = tuple(slice(o, o + s) for o, s in zip(offset, x_target_size))
+
+    return x[slices]
 # apply training for one epoch
 def train(
     model,
@@ -657,6 +669,8 @@ def train(
 
         # apply model and calculate loss
         prediction = model(x)
+        if prediction.shape != y.shape:
+            y = crop(y, prediction)
         loss = loss_function(prediction, y)
 
         # backpropagate the loss and adjust the parameters
