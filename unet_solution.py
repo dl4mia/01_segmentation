@@ -52,7 +52,7 @@ from local import NucleiDataset, show_random_dataset_image, train, apply_and_sho
 
 # %%
 # make sure gpu is available. Please call a TA if this cell fails
-assert torch.cuda.is_available()
+# assert torch.cuda.is_available()
 
 
 # %% [markdown]
@@ -61,8 +61,8 @@ assert torch.cuda.is_available()
 # ## The Components of a U-Net
 
 # %% [markdown]
-# The [U-Net](https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/) architecture has proven to outperform the other architectures in segmenting biological and medical images. It is also commonly used for other tasks that require the output to be the same resolution as the input, such as style transfer and denoising. Below is an overview figure of the U-Net architecture ([source](https://pythonawesome.com/u-net-architecture-for-multimodal-biomedical-image-segmentation/)). We will go through each of the components first (hint: all of them can be found in the list of PyTorch modules [here](https://pytorch.org/docs/stable/nn.html#convolution-layers)), and then fit them all together to make our very own U-Net.
-# ![image](static/unet-image.png)
+# The [U-Net](https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/) architecture has proven to outperform the other architectures in segmenting biological and medical images. It is also commonly used for other tasks that require the output to be the same resolution as the input, such as style transfer and denoising. Below is an overview figure of the U-Net architecture from the original [paper](https://arxiv.org/pdf/1505.04597.pdf). We will go through each of the components first (hint: all of them can be found in the list of PyTorch modules [here](https://pytorch.org/docs/stable/nn.html#convolution-layers)), and then fit them all together to make our very own U-Net.
+# ![image](static/UNet_figure.png)
 
 # %% [markdown]
 # ### Component 1: Upsampling
@@ -255,6 +255,10 @@ class ConvBlock(torch.nn.Module):
             torch.nn.ReLU(),  # leave out
         )
 
+        for _name, layer in self.named_modules():
+            if isinstance(layer, torch.nn.Conv2d):
+                torch.nn.init.kaiming_normal_(layer.weight, nonlinearity="relu")
+
     def forward(self, x):
         return self.conv_pass(x) # leave out
 
@@ -300,11 +304,10 @@ class CropAndConcat(torch.nn.Module):
 
         return x[slices]
 
-    def forward(self, f_left, g_out):
-        """TODO: Docstring"""
-        f_cropped = self.crop(f_left, g_out)  # leave this out
+    def forward(self, encoder_output, upsample_output):
+        encoder_cropped = self.crop(encoder_output, upsample_output)  # leave this out
 
-        return torch.cat([f_cropped, g_out], dim=1)  # leave this out
+        return torch.cat([encoder_cropped, upsample_output], dim=1)  # leave this out
 
 
 # %% [markdown]
@@ -375,108 +378,88 @@ apply_and_show_random_image(out_conv)
 # %% [markdown]
 # ## Putting the UNet together
 #
-# Now we will make a UNet class that combines all of these components as shown in the image. Because our UNet class will inherit from pytorch.nn.Module, we get a lot of functionality for free - we just need to initialize the model and write a forward function.
-# ![image](static/unet-image.png)
+# Now we will make a U-Net class that combines all of these components as shown in the image. This image shows a U-Net of depth 5 with specific input channels, feature maps, upsampling, and final activation. Ours will be configurable with regards to depth and other features.
+# ![image](static/UNet_figure.png)
 
 
 # %%
 class UNet(torch.nn.Module):
     def __init__(
         self,
-        depth,
-        in_channels,
-        num_fmaps,
-        fmap_inc_factor,
-        downsample_factor,
-        kernel_size=3,
-        padding="VALID",
-        upsample_mode="nearest",
-        final_activation=None,
-        out_channels=1,
+        depth: int,
+        in_channels: int,
+        out_channels: int = 1, 
+        final_activation: str | None = None,
+        num_fmaps: int = 64,
+        fmap_inc_factor: int = 2,
+        downsample_factor: int = 2,
+        kernel_size: int = 3,
+        padding: str = "same",
+        upsample_mode: str = "nearest",
     ):
-        """Create a U-Net::
-            f_in --> f_left ------------------>> f_right + f_up--> f_out
-                        |                                   ^
-                        v                                   |
-                     g_in --> g_left ------->> g_right --> g_out
-                                 |               ^
-                                 v               |
-                                       ...
-        where each ``-->`` is a convolution pass, each `-->>` a crop, and down
-        and up arrows are max-pooling and transposed convolutions,
-        respectively.
-        The U-Net expects 2D tensors shaped like::
-            ``(batch=1, channels, height, width)``.
+        """A U-Net for 2D input that expects tensors shaped like::
+            ``(batch, channels, height, width)``.
         Args:
             depth:
-                The number of levels in the UNet. 2 is the smallest that really
-                makes sense for the UNet architecture, as a one layer UNet is
+                The number of levels in the U-Net. 2 is the smallest that really
+                makes sense for the U-Net architecture, as a one layer U-Net is
                 basically just 2 conv blocks.
             in_channels:
-                The number of input channels.
-            num_fmaps:
-                The number of feature maps in the first layer. This is also the
-                number of output feature maps. Stored in the ``channels``
-                dimension.
-            fmap_inc_factor:
+                The number of input channels in your dataset.
+            out_channels (optional):
+                How many output channels you want. Depends on your task. Defaults to 1.
+            final_activation (optional):
+                What activation to use in your final output block. Depends on your task.
+                Defaults to None.
+            num_fmaps (optional):
+                The number of feature maps in the first layer. Defaults to 64.
+            fmap_inc_factor (optional):
                 By how much to multiply the number of feature maps between
-                layers. If layer 0 has ``k`` feature maps, layer ``l`` will
-                have ``k*fmap_inc_factor**l``.
-            downsample_factor:
-                Factor to use for down- and up-sampling the
-                feature maps between layers.
+                layers. Layer ``l`` will have ``num_fmaps*fmap_inc_factor**l`` 
+                feature maps. Defaults to 2.
+            downsample_factor (optional):
+                Factor to use for down- and up-sampling the feature maps between layers.
+                Defaults to 2.
             kernel_size (optional):
                 Kernel size to use in convolutions on both sides of the UNet.
                 Defaults to 3.
             padding (optional):
-                How to pad convolutions. Either 'same' or 'valid' (default).
-            final_activation (optional):
-                What activation to use in your final output block. Depends on your task.
-                Defaults to sigmoid
-            out_channels (optional):
-                How many output channels you want. Depends on your task. Defaults to 1.
+                How to pad convolutions. Either 'same' or 'valid'. Defaults to "same."
+            upsample_mode (optional):
+                The upsampling mode to pass to torch.nn.Upsample. Usually "nearest" 
+                or "bilinear." Defaults to "nearest."
         """
 
         super().__init__()
 
         self.depth = depth
         self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.final_activation = final_activation
         self.num_fmaps = num_fmaps
         self.fmap_inc_factor = fmap_inc_factor
         self.downsample_factor = downsample_factor
-        self.out_channels = out_channels
         self.kernel_size = kernel_size
         self.padding = padding
         self.upsample_mode = upsample_mode
-        self.final_activation = final_activation
-        self.out_channels = out_channels
 
         # left convolutional passes
         self.left_convs = torch.nn.ModuleList()
         for level in range(self.depth):
-            print(f"{level=}")
             fmaps_in, fmaps_out = self.compute_fmaps_encoder(level)
-            print(f"{fmaps_in=} {fmaps_out=}")
             self.left_convs.append(
-                ConvBlock(fmaps_in, fmaps_out, self.kernel_size, self.padding) # leave out
-            )
-        
-        # left downsampling passes
-        self.downsample = Downsample(self.downsample_factor)
-
-        # right upsampling passes
-        self.upsample = torch.nn.Upsample(
-                    scale_factor=self.downsample_factor,
-                    mode=self.upsample_mode,
+                ConvBlock(
+                    fmaps_in,
+                    fmaps_out,
+                    self.kernel_size,
+                    self.padding
                 )
-
-        # cropping and concatenating modules
-        self.crop_and_concat = CropAndConcat()
+            )
 
         # right convolutional passes
         self.right_convs = torch.nn.ModuleList()
         for level in range(self.depth - 1):
-            fmaps_in, fmaps_out = self.compute_fmaps_decode(level)
+            fmaps_in, fmaps_out = self.compute_fmaps_decoder(level)
             self.right_convs.append(
                 ConvBlock(
                     fmaps_in,
@@ -485,14 +468,28 @@ class UNet(torch.nn.Module):
                     self.padding,
                 )
             )
-
+        
+        self.downsample = Downsample(self.downsample_factor)
+        self.upsample = torch.nn.Upsample(
+                    scale_factor=self.downsample_factor,
+                    mode=self.upsample_mode,
+                )
+        self.crop_and_concat = CropAndConcat()
         self.final_conv = OutputConv(
-            self.compute_fmaps_decode(0)[1], self.out_channels, self.final_activation
+            self.compute_fmaps_decoder(0)[1], self.out_channels, self.final_activation
         )
 
     def compute_fmaps_encoder(self, level: int) -> tuple[int, int]:
-        """Compute the number of input and output feature maps for a conv block at a given level
-        of the UNet encoder. TODO: add args, output
+        """Compute the number of input and output feature maps for 
+        a conv block at a given level of the UNet encoder (left side). 
+
+        Args:
+            level (int): The level of the U-Net which we are computing
+            the feature maps for. Level 0 is the input level, level 1 is
+            the first downsampled layer, and level=depth - 1 is the bottom layer.
+
+        Output (tuple[int, int]): The number of input and output feature maps
+            of the encoder convolutional pass in the given level.
         """
         if level == 0:  # Leave out function
             fmaps_in = self.in_channels
@@ -502,9 +499,19 @@ class UNet(torch.nn.Module):
         fmaps_out = self.num_fmaps * self.fmap_inc_factor**level
         return fmaps_in, fmaps_out
 
-    def compute_fmaps_decode(self, level: int) -> tuple[int, int]:
-        """Compute the number of input and output feature maps for a conv block at a given level
-        of the UNet decoder. TODO: add args, output
+    def compute_fmaps_decoder(self, level: int) -> tuple[int, int]:
+        """Compute the number of input and output feature maps for a conv block
+        at a given level of the UNet decoder (right side). Note:
+        The bottom layer (depth - 1) is considered an "encoder" conv pass, 
+        so this function is only valid up to depth - 2.
+        
+        Args:
+            level (int): The level of the U-Net which we are computing
+            the feature maps for. Level 0 is the input level, level 1 is
+            the first downsampled layer, and level=depth - 1 is the bottom layer.
+
+        Output (tuple[int, int]): The number of input and output feature maps
+            of the encoder convolutional pass in the given level.
         """
         fmaps_out = self.num_fmaps * self.fmap_inc_factor ** (level)  # Leave out function
         concat_fmaps = self.compute_fmaps_encoder(level)[
@@ -530,7 +537,6 @@ class UNet(torch.nn.Module):
 
         # right
         for i in range(0, self.depth-1)[::-1]:  # leave out center of for loop
-            print(f"right layer {i}")
             upsampled = self.upsample(layer_input)
             concat = self.crop_and_concat(convolution_outputs[i], upsampled)
             conv_output = self.right_convs[i](concat)
@@ -550,7 +556,6 @@ simple_net = UNet(
         padding="valid",
         upsample_mode="nearest",)
 # TODO: fix valid padding error
-# TODO: Apply to one image to test that no errors happen
 
 # %%
 apply_and_show_random_image(simple_net)
