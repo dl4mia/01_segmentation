@@ -7,6 +7,7 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def show_one_image(image_path):
@@ -68,6 +69,54 @@ def show_random_dataset_image(dataset):
     _ = [ax.axis("off") for ax in axarr]  # remove the axes
     print("Image size is %s" % {img[0].shape})
     plt.show()
+
+
+def apply_and_show_random_image(f, path="nuclei_train_data"):
+    ds = NucleiDataset(path)
+
+    # pick random raw image from dataset
+    img_tensor = ds[np.random.randint(len(ds))][0]
+
+    batch_tensor = torch.unsqueeze(img_tensor, 0) # add batch dimension that some torch modules expect
+    out_tensor = f(batch_tensor) # apply torch module
+    out_tensor = out_tensor.squeeze(0) # remove batch dimension
+    img_arr = img_tensor.numpy()[0] # turn into numpy array, look at first channel
+    out_arr = out_tensor.detach().numpy()[0] # turn into numpy array, look at first channel
+    
+    # intialilze figure
+    fig, axs = plt.subplots(1,2, figsize=(10,20))
+    
+    # Show input image, add info and colorbar
+    img_min, img_max = (img_arr.min(), img_arr.max())  # get value range
+    inim = axs[0].imshow(img_arr, vmin = img_min, vmax = img_max)
+    axs[0].set_title("Input Image")
+    axs[0].set_xlabel(f"min: {img_min:.2f}, max: {img_max:.2f}, shape: {img_arr.shape}")
+    div = make_axes_locatable(axs[0])
+    cb = fig.colorbar(inim, cax=div.append_axes("right", size="5%", pad=0.05))
+    cb.outline.set_visible(False)
+    
+    # Show ouput image, add info and colorbar
+    out_min, out_max = (out_arr.min(), out_arr.max()) # get value range
+    outim = axs[1].imshow(out_arr, vmin=out_min,vmax=out_max)
+    axs[1].set_title("First Channel of Output")
+    axs[1].set_xlabel(f"min: {out_min:.2f}, max: {out_max:.2f}, shape: {out_arr.shape}")
+    div = make_axes_locatable(axs[1])
+    cb = fig.colorbar(outim, cax=div.append_axes("right", size="5%", pad=0.05))
+    cb.outline.set_visible(False)
+
+    # center images and remove ticks
+    max_bounds = [max(ax.get_ybound()[1] for ax in axs), max(ax.get_xbound()[1] for ax in axs)]
+    for ax in axs:
+        diffy = abs(ax.get_ybound()[1] - max_bounds[0])
+        diffx = abs(ax.get_xbound()[1] - max_bounds[1])
+        ax.set_ylim([ax.get_ybound()[0]-diffy/2.,max_bounds[0]-diffy/2.])
+        ax.set_xlim([ax.get_xbound()[0] -diffx/2., max_bounds[1]-diffx/2.])
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+        # for spine in ["bottom", "top", "left", "right"]: # get rid of box
+        #     ax.spines[spine].set_visible(False)
+    
 
 
 def train(

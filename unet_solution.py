@@ -48,7 +48,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 from typing import Optional
-from local import NucleiDataset, show_random_dataset_image, train
+from local import NucleiDataset, show_random_dataset_image, train, apply_and_show_random_image
 
 # %%
 # make sure gpu is available. Please call a TA if this cell fails
@@ -264,35 +264,8 @@ class ConvBlock(torch.nn.Module):
 
 
 # %%
-def apply_and_show_random_image(f):
-    ds = NucleiDataset("nuclei_train_data")
-    img_tensor = ds[np.random.randint(len(ds))][0]
-    batch_tensor = torch.unsqueeze(img_tensor, 0)
-    result_tensor = f(batch_tensor)
-    result_tensor = result_tensor.squeeze(0)
-    img_arr = img_tensor.numpy()[0]
-    img_min, img_max = (img_arr.min(), img_arr.max())
-    result_arr = result_tensor.detach().numpy()[0]
-    result_min, result_max = (result_arr.min(), result_arr.max())
-    fig, axs = plt.subplots(1,2, figsize=(10,20), sharey=True, sharex=True)
-    axs[1].imshow(result_arr, vmin=result_min,vmax=result_max, aspect="equal")
-    axs[1].set_title("First Channel of Output")
-    axs[1].set_xlabel(f"min: {result_min:.2f}, max: {result_max:.2f}, shape: {result_arr.shape}")
-    
-    axs[0].imshow(img_arr, vmin = img_min, vmax = img_max, aspect="equal")
-    axs[0].set_title("Input Image")
-    axs[0].set_xlabel(f"min: {img_min:.2f}, max: {img_max:.2f}, shape: {img_arr.shape}")
-    for ax in axs:
-        for spine in ["bottom", "top", "left", "right"]:
-            ax.spines[spine].set_visible(False)
-            ax.set_xticks([])
-            ax.set_yticks([])
-    
-
-
-# %%
-torch.manual_seed(63)
-conv = ConvPass(1,2,3,"valid")
+torch.manual_seed(26)
+conv = ConvBlock(1,2,3,"valid")
 apply_and_show_random_image(conv)
 
 
@@ -505,7 +478,7 @@ class UNet(torch.nn.Module):
         for level in range(self.depth - 1):
             fmaps_in, fmaps_out = self.compute_fmaps_decode(level)
             self.right_convs.append(
-                ConvPass(
+                ConvBlock(
                     fmaps_in,
                     fmaps_out,
                     self.kernel_size,
