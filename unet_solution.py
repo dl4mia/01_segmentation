@@ -19,6 +19,17 @@
 # 3. Train with various configurations, similar to Will's exercise below, but with actually training multiple configurations (e.g. with and without skip connections), and visually inspect training samples in tensorboard. Use semantic segmentation on kaggle dataset with provided training and no validation, no augmentation, and no quantiative metrics (leave these for actual semantic segmentation exercise.
 
 # %% [markdown]
+# TODOS:
+# - Fix display function to be centered and know which is smaller and move to imports
+# - Test for crop and concat
+# - Test shape of outputs for different blocks
+# - Better explain unet implementation where each element of list is a layer (good scaffolding)
+# - Create solution tags and empty scaffolding
+# - Introduce dataset and segmentation in one cell
+# - Better training tasks
+# - Receptive field visualization?
+
+# %% [markdown]
 # <hr style="height:2px;">
 #
 # ## The libraries
@@ -85,7 +96,7 @@ sample_2d_input
 # </div>
 
 # %%
-up = torch.nn.Upsample(scale_factor=2, mode="nearest")  # 
+up = torch.nn.Upsample(scale_factor=2, mode="nearest")   
 up(sample_2d_input)
 
 # %% [markdown]
@@ -112,10 +123,10 @@ sample_2d_input
 #         <p>Using the docs for <a href=https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html>torch.nn.MaxPool2d</a>,
 #         try it out in function form in the cell below. Try varying the stride and the padding, to see how the output changes.
 #         </p>
-# <b>Pytorch Note:</b> torch.nn.functional provides functions analagous to most common torch Modules. These are handy for testing a pytorch function outside of a neural network/Module, but should not be used inside torch Modules.
 
 # %%
-torch.nn.functional.max_pool2d(sample_2d_input, kernel_size=2, stride=2, padding=0)
+max_pool = torch.nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+max_pool(sample_2d_input)
 
 
 # %% [markdown]
@@ -245,11 +256,11 @@ class ConvBlock(torch.nn.Module):
         )
 
     def forward(self, x):
-        return self.conv_pass(x)
+        return self.conv_pass(x) # leave out
 
 
 # %% [markdown]
-# ## Visualize Output of ConvBlock
+# #### Visualize Output of ConvBlock
 
 
 # %%
@@ -394,9 +405,6 @@ apply_and_show_random_image(out_conv)
 # Now we will make a UNet class that combines all of these components as shown in the image. Because our UNet class will inherit from pytorch.nn.Module, we get a lot of functionality for free - we just need to initialize the model and write a forward function.
 # ![image](static/unet-image.png)
 
-
-# %% [markdown]
-# TODO: Finish cleaning up this UNet to match our defined solutions above. Then, decide which parts they should implement.
 
 # %%
 class UNet(torch.nn.Module):
