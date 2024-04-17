@@ -561,6 +561,27 @@ simple_net = UNet(
 apply_and_show_random_image(simple_net)
 
 # %% [markdown]
+# ### Receptive Field
+#
+# The receptive field of a U-Net is the set of input pixels that contribute to a specific output pixel.
+#
+# The receptive field of a single 3x3 convolution is simply the 3x3 grid of inputs. Each subsequent convolution adds the (kernel size - 1) to the receptive field, so two 3x3 convolutions have a 5x5 receptive field for each output pixel.
+#
+# Downsampling increases the receptive field as well. After 2x2 max pooling, a 3x3 convolution has a receptive field of 6x6 pre-downsampled pixels. Every operation further increases the receptive field, so the final receptive field of a U-Net output depends on the depth, kernel size, and downsample factor.
+#
+# The `plot_receptive_field` function visualizes the receptive field of a given U-Net - the square shows how many input pixels contribute to the output at the center pixel. Try it out with different U-Nets to get a sense of how varying the depth, kernel size, and downsample factor affect the receptive field of a U-Net.
+
+# %%
+from local import plot_receptive_field
+
+new_net = UNet(
+        depth=2,
+        in_channels=1,
+        downsample_factor=2,
+        kernel_size=3,)
+plot_receptive_field(new_net)
+
+# %% [markdown]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 2</h2>
 #

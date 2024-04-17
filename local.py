@@ -197,3 +197,50 @@ def train(
         if early_stop and batch_id > 5:
             print("Stopping test early!")
             break
+
+def compute_receptive_field(depth, kernel_size, downsample_factor):
+    fov = 1
+    downsample_factor_prod = 1
+    # encoder
+    for layer in range(depth - 1):
+        # two convolutions, each adds (kernel size - 1 ) * current downsampling level
+        fov = fov + 2 * (kernel_size - 1) * downsample_factor_prod
+        # downsampling multiplies by downsample factor
+        fov = fov * downsample_factor
+        downsample_factor_prod *= downsample_factor
+    # bottom layer just two convs
+    fov = fov + 2 * (kernel_size - 1) * downsample_factor_prod
+
+    # decoder
+    for layer in range(0, depth - 1)[::-1]:
+        # upsample
+        downsample_factor_prod /= downsample_factor
+        # two convolutions, each adds (kernel size - 1) * current downsampling level
+        fov = fov + 2 * (kernel_size - 1) * downsample_factor_prod
+
+    return fov
+
+
+def plot_receptive_field(unet, npseed=10, path="nuclei_train_data"):
+    ds = NucleiDataset(path)
+    np.random.seed(npseed)
+    img_tensor = ds[np.random.randint(len(ds))][0]
+    
+    img_arr = np.squeeze(img_tensor.numpy())
+    print(img_arr.shape)
+    fov = compute_receptive_field(unet.depth, unet.kernel_size, unet.downsample_factor)
+
+    fig=plt.figure(figsize=(5, 5))
+    plt.imshow(img_arr)#, cmap='gray')
+    
+    # visualize receptive field
+    xmin = img_arr.shape[1]/2 - fov/2
+    xmax = img_arr.shape[1]/2 + fov/2
+    ymin = img_arr.shape[0]/2 - fov/2
+    ymax = img_arr.shape[0]/2 + fov/2
+    color = "red"
+    plt.hlines(ymin, xmin, xmax, color=color, lw=3)
+    plt.hlines(ymax, xmin, xmax, color=color, lw=3)
+    plt.vlines(xmin, ymin, ymax, color=color, lw=3)
+    plt.vlines(xmax, ymin, ymax, color=color, lw=3)
+    plt.show()
