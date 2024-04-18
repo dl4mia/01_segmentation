@@ -30,17 +30,12 @@
 # %%
 # %matplotlib inline
 # %load_ext tensorboard
-import os
-from pathlib import Path
-import imageio
-import matplotlib.pyplot as plt
-import numpy as np
-from PIL import Image
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
-from torchvision import transforms
+
+import torchvision.transforms.v2 as transforms_v2
 
 # %%
 # make sure gpu is available. Please call a TA if this cell fails
@@ -59,15 +54,16 @@ from local import (
     NucleiDataset,
     show_random_dataset_image,
     show_random_dataset_image_with_prediction,
+    show_random_augmentation_comparison,
     train,
 )
 from unet import UNet
 
 # %%
 
-train_data = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
+train_data = NucleiDataset("nuclei_train_data", transforms_v2.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
-val_data = NucleiDataset("nuclei_val_data", transforms.RandomCrop(256))
+val_data = NucleiDataset("nuclei_val_data", transforms_v2.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
 unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2)
@@ -84,20 +80,6 @@ for epoch in range(10):
         device="cpu",
     )
 
-# %%
-
-def show_random_dataset_image_with_prediction(dataset, model, device="cpu"):
-    idx = np.random.randint(0, len(dataset))  # take a random sample
-    img, mask = dataset[idx]  # get the image and the nuclei masks
-    x = img.to(device).unsqueeze(0)
-    y = model(x)[0].detach().cpu().numpy()
-    f, axarr = plt.subplots(1, 3)  # make two plots on one figure
-    axarr[0].imshow(img[0])  # show the image
-    axarr[1].imshow(mask[0], interpolation=None)  # show the masks
-    axarr[2].imshow(y[0], interpolation=None)  # show the prediction
-    _ = [ax.axis("off") for ax in axarr]  # remove the axes
-    print("Image size is %s" % {img[0].shape})
-    plt.show()
 
 # %%
 # TODO: Implement a function to show a random image from the dataset with the prediction given a UNet
@@ -446,14 +428,15 @@ validate(
 # 2 other augmentations.
 
 # %%
+train_data = NucleiDataset("nuclei_train_data", transforms_v2.RandomCrop(256))
 augmented_data = NucleiDataset(
     "nuclei_train_data",
-    transforms.RandomCrop(256),
-    img_transform=transforms.Compose([transforms.GaussianBlur(5)]),
+    transforms_v2.RandomCrop(256),
+    img_transform=transforms_v2.Compose([transforms_v2.GaussianBlur(5, sigma=10.0), transforms_v2.RandomRotation(45)]),
 )
 
 # %%
-show_random_dataset_image(augmented_data)
+show_random_augmentation_comparison(train_data, augmented_data)
 
 
 # %% [markdown]

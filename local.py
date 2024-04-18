@@ -71,6 +71,32 @@ def show_random_dataset_image(dataset):
     print("Image size is %s" % {img[0].shape})
     plt.show()
 
+def show_random_dataset_image_with_prediction(dataset, model, device="cpu"):
+    idx = np.random.randint(0, len(dataset))  # take a random sample
+    img, mask = dataset[idx]  # get the image and the nuclei masks
+    x = img.to(device).unsqueeze(0)
+    y = model(x)[0].detach().cpu().numpy()
+    f, axarr = plt.subplots(1, 3)  # make two plots on one figure
+    axarr[0].imshow(img[0])  # show the image
+    axarr[1].imshow(mask[0], interpolation=None)  # show the masks
+    axarr[2].imshow(y[0], interpolation=None)  # show the prediction
+    _ = [ax.axis("off") for ax in axarr]  # remove the axes
+    print("Image size is %s" % {img[0].shape})
+    plt.show()
+
+def show_random_augmentation_comparison(dataset_a, dataset_b):
+    assert len(dataset_a) == len(dataset_b)
+    idx = np.random.randint(0, len(dataset_a))  # take a random sample
+    img_a, mask_a = dataset_a[idx]  # get the image and the nuclei masks
+    img_b, mask_b = dataset_b[idx]  # get the image and the nuclei masks
+    f, axarr = plt.subplots(2, 2)  # make two plots on one figure
+    axarr[0,0].imshow(img_a[0])  # show the image
+    axarr[0,1].imshow(mask_a[0], interpolation=None)  # show the masks
+    axarr[1,0].imshow(img_b[0])  # show the image
+    axarr[1,1].imshow(mask_b[0], interpolation=None)  # show the prediction
+    _ = [ax.axis("off") for ax in axarr.flatten()]  # remove the axes
+    plt.show()
+
 
 def apply_and_show_random_image(f, path="nuclei_train_data"):
     ds = NucleiDataset(path)
