@@ -74,7 +74,7 @@ show_random_dataset_image(dataset)
 # #### Pytorch Modules
 # Modules are the building blocks of PyTorch models, and contain lots of magic that makes training models easy. If you aren't familiar with PyTorch modules, take a look at the official documentation [here](https://pytorch.org/docs/stable/notes/modules.html). For our purposes, it is crucial to note how Modules can have submodules defined in the `__init__` function, and how the `forward` function is defined and called.
 
-# %%
+# %% tags=[]
 # Here we make fake input to illustrate the upsampling techniques
 # Pytorch expects a batch and channel dimension before the actual data,
 # So this simulates a 1D input
@@ -94,14 +94,26 @@ sample_2d_input
 #     </ol>
 # </div>
 
-# %%
+# %% tags=[]
+# Task 6.1: initialize  an upsample module
+up = ... # YOUR CODE HERE
+
+# Task 6.2: apply your upsample module to `sample_2d_input`
+
+# YOUR CODE HERE
+
+# %% tags=[]
+# Task 6.3: vary scale factor and mode
+# YOUR CODE HERE
+
+# %% tags=["solution"]
 up = torch.nn.Upsample(scale_factor=2, mode="nearest")   # need to keep scaffolding for up here
 up(sample_2d_input)
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # Here is an additional example on image data.
 
-# %%
+# %% tags=[]
 apply_and_show_random_image(up)
 
 # %% [markdown]
@@ -111,25 +123,29 @@ apply_and_show_random_image(up)
 # Between each layer of the U-Net on the left side, there is a downsample step. Traditionally, this is done with a 2x2 max pooling operation. There are other ways to downsample, for example with average pooling, but we will stick with max pooling for this exercise.
 
 
-# %%
+# %% tags=[]
 sample_2d_input = torch.tensor(np.arange(16, dtype=np.float64).reshape((1,1,4,4)))
 sample_2d_input
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
-#     <b>Task 2.1:</b> Try out max pooling
+#     <b>Task 2A:</b> Try out max pooling
 #         <p>Using the docs for <a href=https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html>torch.nn.MaxPool2d</a>,
-#         try it out in function form in the cell below. Try varying the stride and the padding, to see how the output changes.
+#         try initializing the module and applying it to the sample input. Try varying the stride and the padding, to see how the output changes.
 #         </p>
 
-# %%
+# %% tags=[]
+# TASK2A: Initialize max pooling and apply to sample input
+# YOUR CODE HERE
+
+# %% tags=["solution"]
 max_pool = torch.nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 max_pool(sample_2d_input)
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
-#     <b>Task 2.2:</b> Implement a Downsample Module
+#     <b>Task 2B:</b> Implement a Downsample Module
 #     <p>This is very similar to the built in MaxPool2D, but additionally has to check if the downsample factor matches in the input size. Note that we provide the forward function for you - in future Modules, you will implement the forward yourself.</p>
 #     <ol>
 #         <li>Declare the submodules you want to use (in this case, <code>torch.nn.MaxPool2D</code> with the correct arguments) in the <code>__init__</code> function. In our Downsample Module, we do not want to allow padding or strides other than the input kernel size.</li>
@@ -137,7 +153,7 @@ max_pool(sample_2d_input)
 #     </ol>
 # </div>
 
-# %%
+# %% tags=[]
 class Downsample(torch.nn.Module):
     def __init__(self, downsample_factor: int):
         """TODO: Docstring"""
@@ -145,7 +161,34 @@ class Downsample(torch.nn.Module):
         super().__init__()
 
         self.downsample_factor = downsample_factor
+        # Task 2B1: Initialize the downsample module
+        self.down = ... # YOUR CODE HERE
 
+    def check_valid(self, image_size: tuple[int, int]) -> bool:
+        """Check if the downsample factor evenly divides each image dimension
+        Note: there are multiple ways to do this!
+        """
+        # Task 2B2: Check that the image_size is valid to use with the downsample factor
+        # YOUR CODE HERE
+
+    def forward(self, x):
+        if not self.check_valid(tuple(x.size()[-2:])):
+            raise RuntimeError(
+                "Can not downsample shape %s with factor %s"
+                % (x.size(), self.downsample_factor)
+            )
+
+        return self.down(x)
+
+
+# %% tags=["solution"]
+class Downsample(torch.nn.Module):
+    def __init__(self, downsample_factor: int):
+        """TODO: Docstring"""
+
+        super().__init__()
+
+        self.downsample_factor = downsample_factor
         self.down = torch.nn.MaxPool2d(
             downsample_factor
         )  # leave out
@@ -169,14 +212,14 @@ class Downsample(torch.nn.Module):
         return self.down(x)
 
 
-# %%
+# %% tags=[]
 down = Downsample(4)
 apply_and_show_random_image(down)
 
 # %% [markdown]
 # We wrote some rudimentary tests for each of the torch modules you are writing. If you get an error from your code or an AssertionError from the test, you should probably have another look ath your implementation.
 
-# %%
+# %% tags=[]
 unet_tests.TestDown(Downsample).run()
 
 # %% [markdown]
@@ -205,7 +248,7 @@ unet_tests.TestDown(Downsample).run()
 #
 # <img src="./static/ReLU.png" width="400" height="300">
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
 #     <b>Task 3:</b> Implement a ConvBlock module
 #     <p>The convolution block (ConvBlock) of a standard U-Net has two 3x3 convolutions, each of which is followed by a ReLU activation. Our implementation will handle other sizes of convolutions as well. The first convolution in the block will handle changing the input number of feature maps/channels into the output, and the second convolution will have the same number of feature maps in and out.</p>
@@ -218,7 +261,56 @@ unet_tests.TestDown(Downsample).run()
 # If you get stuck, refer back to the <a href=https://pytorch.org/docs/stable/notes/modules.html>Module</a> documentation for hints and examples of how to define a PyTorch Module. 
 
 
-# %%
+# %% tags=[]
+class ConvBlock(torch.nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        padding: str = "same",
+    ):
+        """ A convolution block for a U-Net. Contains two convolutions, each followed by a ReLU.
+
+        Args:
+            in_channels (int): The number of input channels for this conv block. Depends on
+                the layer and side of the U-Net and the hyperparameters.
+            out_channels (int): The number of output channels for this conv block. Depends on
+                the layer and side of the U-Net and the hyperparameters.
+            kernel_size (int): The size of the kernel. A kernel size of N signifies an
+                NxN square kernel.
+        """
+        super().__init__()
+
+        if kernel_size % 2 == 0:
+            msg = "Only allowing odd kernel sizes."
+            raise ValueError(msg)
+        # TASK 3.1: Initialize your modules
+        
+        # determine padding size based on method
+        if padding.upper() == "VALID":
+            # YOUR CODE HERE
+        elif padding.upper() == "SAME":
+            # YOUR CODE HERE
+        else:
+            msg = "invalid string value for padding. Choose SAME or VALID."
+            raise ValueError(msg)
+
+        # define layers in conv pass
+        # YOUR CODE HERE
+        
+
+        # use suitable weight initialization for relu
+        for _name, layer in self.named_modules():
+            if isinstance(layer, torch.nn.Conv2d):
+                torch.nn.init.kaiming_normal_(layer.weight, nonlinearity="relu")
+
+    def forward(self, x):
+        # Task 3.2
+        return self.conv_pass(x) # leave out
+
+
+# %% tags=["solution"]
 class ConvBlock(torch.nn.Module):
     def __init__(
         self,
