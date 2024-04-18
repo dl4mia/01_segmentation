@@ -256,7 +256,7 @@ class InstanceDataset(Dataset):
 # ### Test your function
 # - Create training and validation datasets and data loaders
 # - use `show_random_dataset_image` to verify that your dataset solution is correct
-#   - output should show 2 images: the raw image and the SDT matching the one shown in task 1.1
+#   - output should show 2 images: the raw image and the SDT
 # %%
 from local import show_random_dataset_image
 
@@ -272,11 +272,15 @@ show_random_dataset_image(train_data)
 # <b>Task 1.3</b>: Train the Unet
 # </div>
 # %% [markdown]
-#   - loss function hint: [torch losses](https://pytorch.org/docs/stable/nn.html#loss-functions)
-#   - optimizer hint: [torch optimizers](https://pytorch.org/docs/stable/optim.html)
+# Hints:
+#   - loss function - [torch losses](https://pytorch.org/docs/stable/nn.html#loss-functions)
+#   - optimizer - [torch optimizers](https://pytorch.org/docs/stable/optim.html)
+#   - final_activation - there are a few options (only one is the best)
+#       - [sigmoid](https://pytorch.org/docs/stable/generated/torch.nn.Sigmoid.html)
+#       - [tanh](https://pytorch.org/docs/stable/generated/torch.nn.Tanh.html#torch.nn.Tanh)
+#       - [relu](https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU)
 
 # %%
-
 from local import train
 import torch
 from unet import UNet
@@ -291,7 +295,7 @@ unet = UNet(
     kernel_size=,
     padding=,
     upsample_mode=,
-    final_activation=torch.nn.Tanh(), # Why does this need to be tanh?
+    final_activation=, 
     out_channels=,
 )
 
@@ -335,7 +339,7 @@ for epoch in range(5):
     )
 
 # %% [markdown]
-# Here we will run inference using our trained model
+# Next run inference using our trained model and visualize some random samples
 
 # %%
 unet.eval()
@@ -360,13 +364,17 @@ plt.show()
 # %% [markdown]
 # <div class="alert alert-block alert-success">
 # <h2> Checkpoint 1 </h2>
+#
+# At this point we have a model that does what we told it too, but not yet a segmentation.
+#
+# In the next section we will perform some post-processing and get our segmentations.
 # %% [markdown]
 # <hr style="height:2px;">
 #
 # ## Section 2: Post-Processing
 # - See here for a nice overview: [scikit-image watershed](https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_watershed.html)
-# 1. Given the distance transform (the output of our model), we first need to find the local maxima that will be used as seed points
-# 2. The watershed algorithm then expands each seed out in a local "basin" until the segments touch.
+# - Given the distance transform (the output of our model), we first need to find the local maxima that will be used as seed points
+# - The watershed algorithm then expands each seed out in a local "basin" until the segments touch.
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
@@ -516,7 +524,7 @@ plt.show()
 # </div>
 # %% [markdown]
 # Which of the following should we use for our dataset?:
-#   1) [Accuracy](https://metrics-reloaded.dkfz.de/metric?id=accuracy)
+#   1) [Dice](https://metrics-reloaded.dkfz.de/metric?id=dsc)
 #   2) [Average Precision](https://metrics-reloaded.dkfz.de/metric?id=average_precision)
 #   3) [Sensitivity](https://metrics-reloaded.dkfz.de/metric?id=sensitivity) and [Specificity](https://metrics-reloaded.dkfz.de/metric?id=specificity@target_value)
 # 
@@ -527,7 +535,7 @@ plt.show()
 # </div>
 # %%
 from instance_utils import evaluate
-# need to re-initialize the dataloader to use uniquely labeled ground_truth masks
+# need to re-initialize the dataloader to return masks in addition to SDTs
 val_data = InstanceDataset("nuclei_val_data", transforms.RandomCrop(256), return_mask=True)
 val_loader = DataLoader(val_data, batch_size=5)
 
@@ -572,7 +580,7 @@ for idx, (image, mask, sdt) in enumerate(val_loader):
 # ![image](static/05_instance_affinity.png)
 
 # %% [markdown]
-# 
+# Similar to the pipeline used for SDTs, we first need to modify the dataset to produce affinities.
 
 #%%
 # create a new dataset for affinities
@@ -630,6 +638,9 @@ class affinityDataset(Dataset):
         aff_target_array = compute_affinities(np.asarray(mask), [[0,1],[1,0]])
         aff_target = torch.from_numpy(aff_target_array)
         return aff_target.float()
+
+# %% [markdown]
+# next we initialize the datasets and data loaders
 # %%
 # Initialize the datasets
 from local import train
@@ -641,7 +652,19 @@ val_data = affinityDataset("nuclei_val_data", transforms.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
 show_random_dataset_image(train_data)
-#%%
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+# <b>Task 4.1</b>: Train a model on affinities
+# </div>
+# %%
+# repurpose your training loop for the SDTs
+
+# Think carefully about your loss and final activation, 
+# the best for SDT is no necessarily the best for affinities
+
+
+#%% tags=["solutions"]
 unet = UNet(
     depth=3,
     in_channels=1,
@@ -651,7 +674,7 @@ unet = UNet(
     kernel_size=3,
     padding="same",
     upsample_mode="nearest",
-    final_activation=torch.nn.Sigmoid(),
+    final_activation=torch.nn.Sigmoid(), # different from SDTs
     out_channels=2,
 )
 
