@@ -31,7 +31,6 @@ import datetime
 from PIL import Image
 
 from glob import glob
-from natsort import natsorted
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -144,9 +143,10 @@ plt.show()
 class InstanceDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
-    def __init__(self, root_dir, transform=None, img_transform=None):
+    def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
         self.root_dir = root_dir  # the directory with all the training samples
         self.samples = os.listdir(root_dir)  # list the samples
+        self.return_mask = return_mask
         self.transform = (
             transform  # transformations to apply to both inputs and targets
         )
@@ -174,7 +174,7 @@ class InstanceDataset(Dataset):
         # since many torchvision transforms operate on PIL images
         image = Image.open(img_path)
         image = self.inp_transforms(image)
-        mask_path = os.path.join(self.root_dir, self.samples[idx], "mask.tif")
+        mask_path = os.path.join(self.root_dir, self.samples[idx], "label.tif")
         mask = Image.open(mask_path)
         if self.transform is not None:
             # Note: using seeds to ensure the same random transform is applied to
@@ -186,7 +186,11 @@ class InstanceDataset(Dataset):
             mask = self.transform(mask)
         if self.img_transform is not None:
             image = self.img_transform(image)
-        return image, sdt
+        if self.return_mask is True:
+            return image, mask, sdt
+        else:
+            return image, sdt
+        
     
     def create_sdt_target(...):
 
@@ -197,9 +201,10 @@ class InstanceDataset(Dataset):
 class InstanceDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
-    def __init__(self, root_dir, transform=None, img_transform=None):
+    def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
         self.root_dir = root_dir  # the directory with all the training samples
         self.samples = os.listdir(root_dir)  # list the samples
+        self.return_mask = return_mask
         self.transform = (
             transform  # transformations to apply to both inputs and targets
         )
@@ -224,7 +229,7 @@ class InstanceDataset(Dataset):
         # since many torchvision transforms operate on PIL images
         image = Image.open(img_path)
         image = self.inp_transforms(image)
-        mask_path = os.path.join(self.root_dir, self.samples[idx], "mask.tif")
+        mask_path = os.path.join(self.root_dir, self.samples[idx], "label.tif")
         mask = Image.open(mask_path)
         if self.transform is not None:
             # Note: using seeds to ensure the same random transform is applied to
@@ -237,7 +242,10 @@ class InstanceDataset(Dataset):
             sdt_mask = self.create_sdt_target(mask)
         if self.img_transform is not None:
             image = self.img_transform(image)
-        return image, sdt_mask
+        if self.return_mask is True:
+            return image, transforms.ToTensor()(mask), sdt_mask
+        else:
+            return image, sdt_mask
     
     def create_sdt_target(self, mask):
         sdt_target_array = compute_sdt(mask, constant=0.5, scale=5)
@@ -274,6 +282,18 @@ import torch
 from unet import UNet
 
 # initialize the model
+unet = UNet(
+    depth=,
+    in_channels=,
+    num_fmaps=,
+    fmap_inc_factor=,
+    downsample_factor=,
+    kernel_size=,
+    padding=,
+    upsample_mode=,
+    final_activation=torch.nn.Tanh(), # Why does this need to be tanh?
+    out_channels=,
+)
 
 # choose a loss function
 
@@ -285,16 +305,20 @@ from unet import UNet
 from local import train
 from unet import UNet
 
+
 unet = UNet(
+    depth=3,
     in_channels=1,
     num_fmaps=64,
-    fmap_inc_factors=3,
-    downsample_factors=[(2,2)],
-    num_fmaps_out=1,
-    padding='same'
+    fmap_inc_factor=3,
+    downsample_factor=([2,2]),
+    kernel_size=3,
+    padding="same",
+    upsample_mode="nearest",
+    final_activation=torch.nn.Tanh(),
+    out_channels=1,
 )
 
-# choose a loss function (here are a few options to consider)
 loss = torch.nn.MSELoss()
 
 optimizer = torch.optim.Adam(unet.parameters())
@@ -476,125 +500,176 @@ plt.show()
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
-# <h2> Checkpoint 1 </h2>
+# <h2> Checkpoint 2 </h2>
 
 # %% [markdown]
 # <hr style="height:2px;">
 #
 # ## Section 3: Evaluation
-# Which evaluation metric should we use
-# Use this website to pick a good one
-#
-# https://metrics-reloaded.dkfz.de/problem-category-selection
-#
-# Which metric do you think is best for this dataset
-#
-# 3 -5 example problems with images, want them to choose which metric is best for each
-#
-# 1. cells that are mostly round, but have long protrusions, where our goal is to quantify the number of protrusions
-#
-# 2. mixed population of 2 cells, where our goal is to segment 
-# 1 population form the other and count the number of cells of that population
-#
-# 3. Cells with many small specs where the goal is to segment and count the number of specs
+# Many different evaluation metrics exist, and which one you should use is dependant on the specifics of the data.
 
+# [This website](https://metrics-reloaded.dkfz.de/problem-category-selection) has a good summary of different options.
 
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+# <b>Task 3.1</b>: Pick the best metric to use
+# </div>
+# %% [markdown]
+# Which of the following should we use for our dataset?:
+#   1) [Accuracy](https://metrics-reloaded.dkfz.de/metric?id=accuracy)
+#   2) [Average Precision](https://metrics-reloaded.dkfz.de/metric?id=average_precision)
+#   3) [Sensitivity](https://metrics-reloaded.dkfz.de/metric?id=sensitivity) and [Specificity](https://metrics-reloaded.dkfz.de/metric?id=specificity@target_value)
+# 
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+# <b>Task 3.2</b>: evaluate for the validation dataset
+# </div>
+# %%
+from instance_utils import evaluate
+# need to re-initialize the dataloader to use uniquely labeled ground_truth masks
+val_data = InstanceDataset("nuclei_val_data", transforms.RandomCrop(256), return_mask=True)
+val_loader = DataLoader(val_data, batch_size=5)
+
+unet.eval()
+
+for idx, (image, mask, sdt) in enumerate(val_loader):
+    image = image.to(device)
+    pred = unet(image)
+        
+    image = np.squeeze(image.cpu())
+    gt_labels = np.squeeze(mask.cpu().numpy())
+        
+    pred = np.squeeze(pred.cpu().detach().numpy())
+
+    # feel free to try different thresholds
+    thresh = np.mean(pred)
+
+    # get boundary mask
+    boundary_mask = get_boundary_mask(pred, threshold=thresh)
+
+    pred_labels = watershed_from_boundary_distance(
+        pred,
+        boundary_mask,
+        id_offset=0,
+        min_seed_distance=5)
+
+    ap, precision, recall, tp, fp, fn = evaluate(gt_labels, pred_labels)
 # %% [markdown]
 # <hr style="height:2px;">
 #
 # ## Section 4: Affinities
 # %% [markdown]
 # What are affinities?
+#Here we consider not just the pixel but also its direct neighbors (in 2D the left neighbor and the upper neighbor are sufficient, 
+# right and down are redundant with the next pixel's left and upper neighbor). Imagine there is an edge between two pixels if they 
+# are in the same class and no edge if not. If we then take all pixels that are directly and indirectly connected by edges, we get an 
+# instance. Essentially, we label edges between neighboring pixels as “connected” or “cut”, rather than labeling the pixels themselves. 
+# This representation can be useful especially in the case of smaller objects that would otherwise be classified as background pixels. 
+# We can use mean squared error.
 
 # %% [markdown]
 # ![image](static/05_instance_affinity.png)
 
-# %%
-def erode_border(labels, iterations, border_value):
-    """Function to erode boundary pixels for mask and border."""
-
-    # copy labels to memory, create border array
-    labels = np.copy(labels)
-    border = np.array(labels)
-
-    # create zeros array for foreground
-    foreground = np.zeros_like(labels, dtype=bool)
-
-    # loop through unique labels
-    for label in np.unique(labels):
-
-        # skip background
-        if label == 0:
-            continue
-
-        # mask to label
-        label_mask = labels == label
-
-        # erode labels
-        eroded_mask = binary_erosion(
-                label_mask,
-                iterations=iterations,
-                border_value=border_value)
-
-        # get foreground
-        foreground = np.logical_or(eroded_mask, foreground)
-
-    # and background...
-    background = np.logical_not(foreground)
-
-    # set eroded pixels to zero
-    labels[background] = 0
-
-    # get eroded pixels
-    border = labels - border
-
-    return labels, border
-# %%
-# add create affinities method to the dataset
-def compute_affinities(seg: np.ndarray, nhood: list):
-
-    nhood = np.array(nhood)
-
-    shape = seg.shape
-    nEdge = nhood.shape[0]
-    dims = nhood.shape[1]
-    aff = np.zeros((nEdge,) + shape, dtype=np.int32)
-
-    for e in range(nEdge):
-        aff[e, \
-          max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
-          max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] = \
-                      (seg[max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
-                          max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] == \
-                        seg[max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]), \
-                          max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] ) \
-                      * ( seg[max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
-                          max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] > 0 ) \
-                      * ( seg[max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]), \
-                          max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] > 0 )
-                          
-
-    return aff
-
-# %%
-# visualize affinities
-idx = np.random.randint(0, len(train_data))  # take a random sample
-img, mask = train_data[idx]
-
-labels, border = erode_border(mask, iterations=1, border_value=1)
-affinities = compute_affinities(labels, nhood=[[0,1], [1,0]])
-
-f, axarr = plt.subplots(1, 3)  # make two plots on one figure
-axarr[0].imshow(img[0])  # show the image
-axarr[1].imshow((mask[0]), interpolation=None)  # show the masks
-axarr[2].imshow(affinities[0,0,:,:] + affinities[1,0,:,:])
-
 # %% [markdown]
-# make needed changes to the model
-# train model
-# post-processing
-# evaluation metric
+# 
 
+#%%
+# create a new dataset for affinities
+from instance_utils import erode_border, compute_affinities
+class affinityDataset(Dataset):
+    """A PyTorch dataset to load cell images and nuclei masks"""
+
+    def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
+        self.root_dir = root_dir  # the directory with all the training samples
+        self.samples = os.listdir(root_dir)  # list the samples
+        self.return_mask = return_mask
+        self.transform = (
+            transform  # transformations to apply to both inputs and targets
+        )
+        self.img_transform = img_transform  # transformations to apply to raw image only
+        #  transformations to apply just to inputs
+        self.inp_transforms = transforms.Compose(
+            [
+                transforms.Grayscale(),  # some of the images are RGB
+                transforms.ToTensor(),
+                transforms.Normalize([0.5], [0.5]), # 0.5 = mean and 0.5 = variance 
+            ]
+        )
+
+    # get the total number of samples
+    def __len__(self):
+        return len(self.samples)
+
+    # fetch the training sample given its index
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.root_dir, self.samples[idx], "image.tif")
+        # we'll be using Pillow library for reading files
+        # since many torchvision transforms operate on PIL images
+        image = Image.open(img_path)
+        image = self.inp_transforms(image)
+        mask_path = os.path.join(self.root_dir, self.samples[idx], "label.tif")
+        mask = Image.open(mask_path)
+        if self.transform is not None:
+            # Note: using seeds to ensure the same random transform is applied to
+            # the image and mask
+            seed = torch.seed()
+            torch.manual_seed(seed)
+            image = self.transform(image)
+            torch.manual_seed(seed)
+            mask = self.transform(mask)
+            aff_mask = self.create_aff_target(mask)
+        if self.img_transform is not None:
+            image = self.img_transform(image)
+        if self.return_mask is True:
+            return image, transforms.ToTensor()(mask), aff_mask
+        else:
+            return image, aff_mask
+    
+    def create_aff_target(self, mask):
+        aff_target_array = compute_affinities(np.asarray(mask), [[0,1],[1,0]])
+        aff_target = torch.from_numpy(aff_target_array)
+        return aff_target.float()
+# %%
+# Initialize the datasets
+from local import train
+from unet import UNet
+
+train_data = affinityDataset("nuclei_train_data", transforms.RandomCrop(256))
+train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
+val_data = affinityDataset("nuclei_val_data", transforms.RandomCrop(256))
+val_loader = DataLoader(val_data, batch_size=5)
+
+show_random_dataset_image(train_data)
+#%%
+unet = UNet(
+    depth=3,
+    in_channels=1,
+    num_fmaps=64,
+    fmap_inc_factor=3,
+    downsample_factor=([2,2]),
+    kernel_size=3,
+    padding="same",
+    upsample_mode="nearest",
+    final_activation=torch.nn.Sigmoid(),
+    out_channels=2,
+)
+
+# choose a loss function 
+loss = torch.nn.MSELoss()
+
+optimizer = torch.optim.Adam(unet.parameters())
+
+for epoch in range(5):
+    train(
+        unet,
+        train_loader,
+        optimizer,
+        loss,
+        epoch,
+        log_interval=1,
+        device="cpu", # make sure to set to cuda
+    )
 # %% [markdown]
 # <hr style="height:2px;">
 #
