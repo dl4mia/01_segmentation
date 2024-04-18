@@ -14,7 +14,6 @@
 
 # %% [markdown]
 # TODOS:
-# - Test shape of outputs for different blocks
 # - Create solution tags and empty scaffolding
 
 # %% [markdown]
