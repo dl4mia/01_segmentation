@@ -174,6 +174,9 @@ class Downsample(torch.nn.Module):
 down = Downsample(4)
 apply_and_show_random_image(down)
 
+# %% [markdown]
+# We wrote some rudimentary tests for each of the torch modules you are writing. If you get an error from your code or an AssertionError from the test, you should probably have another look ath your implementation.
+
 # %%
 unet_tests.TestDown(Downsample).run()
 
