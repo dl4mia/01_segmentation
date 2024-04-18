@@ -140,7 +140,7 @@ plt.show()
 # </div>
 
 # %%
-class InstanceDataset(Dataset):
+class SdtDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
@@ -198,7 +198,7 @@ class InstanceDataset(Dataset):
 
         return 
 # %% tags=["solution"]
-class InstanceDataset(Dataset):
+class SdtDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
@@ -260,9 +260,9 @@ class InstanceDataset(Dataset):
 # %%
 from local import show_random_dataset_image
 
-train_data = InstanceDataset("nuclei_train_data", transforms.RandomCrop(256))
+train_data = SdtDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
-val_data = InstanceDataset("nuclei_val_data", transforms.RandomCrop(256))
+val_data = SdtDataset("nuclei_val_data", transforms.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
 show_random_dataset_image(train_data)
@@ -537,14 +537,15 @@ plt.show()
 # %%
 from local import evaluate
 # need to re-initialize the dataloader to return masks in addition to SDTs
-val_data = InstanceDataset("nuclei_val_data", transforms.RandomCrop(256), return_mask=True)
-val_loader = DataLoader(val_data, batch_size=5)
+val_data_mask = SdtDataset("nuclei_val_data", transforms.RandomCrop(256), return_mask=True)
+val_loader_mask = DataLoader(val_data, batch_size=5)
 
 unet.eval()
 
-for idx, (image, mask, sdt) in enumerate(val_loader):
+
+for idx, (image, mask, sdt) in enumerate(val_loader_mask):
     image = image.to(device)
-    pred = unet(image)
+    pred = unet(torch.unsqueeze(image, dim=0))
         
     image = np.squeeze(image.cpu())
     gt_labels = np.squeeze(mask.cpu().numpy())
@@ -586,7 +587,8 @@ for idx, (image, mask, sdt) in enumerate(val_loader):
 #%%
 # create a new dataset for affinities
 from local import compute_affinities
-class affinityDataset(Dataset):
+class AffinityDataset(Dataset):
+
     """A PyTorch dataset to load cell images and nuclei masks"""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
@@ -647,9 +649,9 @@ class affinityDataset(Dataset):
 from local import train
 from unet import UNet
 
-train_data = affinityDataset("nuclei_train_data", transforms.RandomCrop(256))
+train_data = AffinityDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
-val_data = affinityDataset("nuclei_val_data", transforms.RandomCrop(256))
+val_data = AffinityDataset("nuclei_val_data", transforms.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
 show_random_dataset_image(train_data)
@@ -658,10 +660,10 @@ show_random_dataset_image(train_data)
 # <div class="alert alert-block alert-info">
 # <b>Task 4.1</b>: Train a model on affinities
 # </div>
-# %%
+# %% [markdown]
 # repurpose your training loop for the SDTs
 
-# Think carefully about your loss and final activation, 
+# Think carefully about your loss and final activation,
 # the best for SDT is no necessarily the best for affinities
 
 
@@ -694,10 +696,47 @@ for epoch in range(5):
         log_interval=1,
         device="cpu", # make sure to set to cuda
     )
+
+# %% [markdown]
+# evaluation
+
+# %%
+val_data_mask = AffinityDataset("nuclei_val_data", transforms.RandomCrop(256), return_mask=True)
+val_loader_mask = DataLoader(val_data, batch_size=5)
+
+unet.eval()
+
+
+for idx, (image, mask, sdt) in enumerate(val_loader_mask):
+    image = image.to(device)
+    pred = unet(torch.unsqueeze(image, dim=0))
+        
+    image = np.squeeze(image.cpu())
+    gt_labels = np.squeeze(mask.cpu().numpy())
+        
+    pred = np.squeeze(pred.cpu().detach().numpy())
+
+    # feel free to try different thresholds
+    thresh = np.mean(pred)
+
+    # get boundary mask
+    boundary_mask = get_boundary_mask(pred, threshold=thresh)
+
+    pred_labels = watershed_from_boundary_distance(
+        pred,
+        boundary_mask,
+        id_offset=0,
+        min_seed_distance=5)
+
+    ap, precision, recall, tp, fp, fn = evaluate(gt_labels, pred_labels)
+
+# %% [markdown]
+# Conclusions
+
 # %% [markdown]
 # <hr style="height:2px;">
 #
-# ## Section 5: Pre-Trained Models
+# ## Bonus: Pre-Trained Models
 # try running cellpose from script
 
 # %%
