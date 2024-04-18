@@ -6,21 +6,26 @@ class TestDown:
         self.down_module = down_module
     def test_shape_checker(self):
         down2 = self.down_module(2)
-        assert down2.check_valid((8,8))
-        assert not down2.check_valid((9,9))
+        msg = "Your `check_valid` function is not right yet."
+        assert down2.check_valid((8,8)), msg
+        assert not down2.check_valid((9,9)), msg
         down3 = self.down_module(3)
-        assert down3.check_valid((9,9))
-        assert not down3.check_valid((8,8))
+        assert down3.check_valid((9,9)), msg
+        assert not down3.check_valid((8,8)), msg
         
     
     def test_shape(self):
         tensor2 = torch.arange(16).reshape((1,4,4))
         down2 = self.down_module(2)
         expected = torch.Tensor([5,7,13,15]).reshape((1,2,2))
-        assert torch.equal(expected, down2(tensor2))
+        msg = "The output shape of your Downsample module is not correct."
+        assert expected.shape == down2(tensor2).shape, msg
+        msg = "The ouput shape of your Downsample module is correct, but the values are not."
+        assert torch.equal(expected, down2(tensor2)), msg
     def run(self):
         self.test_shape_checker()
         self.test_shape()
+        print("TESTS PASSED")
 
 
 class TestConvBlock:
@@ -38,7 +43,8 @@ class TestConvBlock:
         
         shape_expected = np.array(shape) - 2 * (kernel_size - 1)
         shape_expected = [out_channels, ] + list(shape_expected)
-        assert tensor_out.shape == torch.Size(shape_expected), "Shape for valid padding is incorrect"
+        msg = "Output shape for valid padding is incorrect."
+        assert tensor_out.shape == torch.Size(shape_expected), msg
     
     def test_shape_same(self):
         shape = [16, 39]
@@ -51,19 +57,23 @@ class TestConvBlock:
         tensor_out = conv(tensor_in)
         
         shape_expected  = [out_channels, ] + shape
-        assert tensor_out.shape == torch.Size(shape_expected)
+        msg = "Output shame for same padding is incorrect."
+        assert tensor_out.shape == torch.Size(shape_expected), msg
     
     def test_relu(self):
         shape = [1, 100, 100]
         tensor_in = torch.randn(shape) * 2
         conv = self.conv_module(1, 50, 5, padding="same")
         tensor_out = conv(tensor_in)
-        assert torch.all(tensor_out >= 0)
+        msg = "Your activation function is incorrect."
+        assert torch.all(tensor_out >= 0), msg
         
     def run(self):
         self.test_shape_valid()
         self.test_shape_same()
-        self.test_relu()
+        for i in range(5):
+            self.test_relu()
+        print("TESTS PASSED")
         
 class TestCropAndConcat:
     def __init__(self, ccmodule):
@@ -75,10 +85,12 @@ class TestCropAndConcat:
         ccmod = self.ccmodule()
         out_tensor = ccmod(big_tensor, small_tensor)
         expected_tensor = torch.cat([torch.ones(12,14,13,18), torch.zeros(12,5, 13, 18)], dim=1)
-        assert torch.equal(out_tensor, expected_tensor)
+        msg = "Your CropAndConcat node does not give the expected output"
+        assert torch.equal(out_tensor, expected_tensor), msg
     
     def run(self):
         self.test_crop()
+        print("TESTS PASSED")
 
 class TestOutputConv:
     def __init__(self, outconvmodule):
@@ -87,9 +99,11 @@ class TestOutputConv:
         outconv = self.outconvmodule(3, 30, activation="Softshrink")
         tensor = torch.ones((3,24, 17))
         tensor_out = outconv(tensor)
-        assert tensor_out.shape == torch.Size((30,24,17))
+        msg = "The output shape of your output conv is not right."
+        assert tensor_out.shape == torch.Size((30,24,17)), msg
     def run(self):
         self.test_channels()
+        print("TESTS PASSED")
         
 class TestUNet:
     def __init__(self, unetmodule):
@@ -98,10 +112,14 @@ class TestUNet:
         unet = self.unetmodule(5, 1, 1, 
                                num_fmaps=17,
                                fmap_inc_factor=4)
-        assert unet.compute_fmaps_encoder(3) == (272, 1088)
-        assert unet.compute_fmaps_decoder(3) ==  (5440, 1088)
-        assert unet.compute_fmaps_encoder(0) == (1, 17)
-        assert unet.compute_fmaps_decoder(0) == (85, 17)
+        msg = "The computation of number of feature maps in the encoder is incorrect"
+        assert unet.compute_fmaps_encoder(3) == (272, 1088), msg
+        msg = "The computation of number of feature maps in the decoder is incorrect"
+        assert unet.compute_fmaps_decoder(3) ==  (5440, 1088), msg
+        msg = "The computation of number of feature maps in the encoder is incorrect for level 0"
+        assert unet.compute_fmaps_encoder(0) == (1, 17), msg
+        msg = "The computation of number of feature maps in the decoder is incorrect for level 0"
+        assert unet.compute_fmaps_decoder(0) == (85, 17), msg
     def test_shape_valid(self):
         unetvalid = self.unetmodule(
             depth=4,
@@ -113,7 +131,8 @@ class TestUNet:
             kernel_size=5,
             padding="valid"
             )
-        assert unetvalid(torch.ones((2,2,536,536))).shape == torch.Size((2,7,112,112))
+        msg = "The output shape of your UNet is incorrect for valid padding."
+        assert unetvalid(torch.ones((2,2,536,536))).shape == torch.Size((2,7,112,112)), msg
     def test_shape_same(self):
         unetsame = self.unetmodule(
             depth=4,
@@ -125,10 +144,12 @@ class TestUNet:
             kernel_size=5,
             padding="same"
             ) 
-        assert unetsame(torch.ones((2,2,112,112))).shape == torch.Size((2,7,112,112))  
+        msg = "The output shape of your Unet is incorrect for same padding."
+        assert unetsame(torch.ones((2,2,243,243))).shape == torch.Size((2,7,243,243)), msg
         
     def run(self):
         self.test_fmaps()
         self.test_shape_valid()
         self.test_shape_same()
+        print("TESTS PASSED")
         
