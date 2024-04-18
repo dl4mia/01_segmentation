@@ -164,7 +164,7 @@ class Downsample(torch.nn.Module):
 
 
 # %%
-down = Downsample(16)
+down = Downsample(4)
 apply_and_show_random_image(down)
 
 # %%
@@ -312,6 +312,9 @@ class CropAndConcat(torch.nn.Module):
         return torch.cat([encoder_cropped, upsample_output], dim=1)  # leave this out
 
 
+# %%
+unet_tests.TestCropAndConcat(CropAndConcat).run()
+
 # %% [markdown]
 # ### Component 5: Output Block
 
@@ -359,6 +362,9 @@ class OutputConv(torch.nn.Module):
 # %%
 out_conv = OutputConv(in_channels=1, out_channels=1, activation="ReLU")
 apply_and_show_random_image(out_conv)
+
+# %%
+unet_tests.TestOutputConv(OutputConv).run()
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
@@ -554,6 +560,9 @@ class UNet(torch.nn.Module):
 
         return self.final_conv(layer_input)
 
+
+# %%
+unet_tests.TestUNet(UNet).run()
 
 # %%
 simple_net = UNet(
