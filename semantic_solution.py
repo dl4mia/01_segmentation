@@ -48,7 +48,7 @@ assert torch.cuda.is_available()
 
 
 # %% [markdown]
-# ### What we have so far
+# ## Section 0: What we have so far
 # You have already implemented a U-Net architecture in the previous exercise. We will use it as a starting point for this exercise.
 # You should also alredy have the dataset and the dataloader implemented, along with a simple train loop with MSELoss.
 # Lets go ahead and visualize some of the data along with some predictions to see how we are doing.
@@ -70,7 +70,7 @@ train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
 val_data = NucleiDataset("nuclei_val_data", transforms.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
-unet = UNet(1, 1, 4, downsample_factors=[[2,2],[2,2],[2,2]], padding="same")
+unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2)
 loss = nn.MSELoss()
 optimizer = torch.optim.Adam(unet.parameters())
 
@@ -220,7 +220,7 @@ assert dice(wrong_prediction, target) == 0.0, dice(wrong_prediction, target)
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-# <b>Task 2.4</b>: What happes if your predictions are not discrete elements of {0,1}?
+# <b>Task 1.2</b>: What happes if your predictions are not discrete elements of {0,1}?
 #     <ol>
 #         <li>What if the predictions are in range (0,1)?</li>
 #         <li>What if the predictions are in range ($-\infty$,$\infty$)?</li>
@@ -242,8 +242,15 @@ assert dice(wrong_prediction, target) == 0.0, dice(wrong_prediction, target)
 # if the target is `[0,1]` then a prediction of `[0,2]` will score higher than a prediction of `[0,3]`.
 
 # %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 2.1</b>: Fix in all the TODOs to make the validate function work. If confused, you can use this
+# <a href="https://pytorch.org/tutorials/beginner/basics/optimization_tutorial.html">PyTorch tutorial</a> as a template
+# </div>
+
+
+# %% [markdown]
 # <div class="alert alert-block alert-success">
-#     <h2>Checkpoint 2</h2>
+#     <h2>Checkpoint 1.1 </h2>
 #
 # This is a good place to stop for a moment. If you have extra time look into some extra
 # evaluation functions or try to implement your own without hints.
@@ -254,12 +261,6 @@ assert dice(wrong_prediction, target) == 0.0, dice(wrong_prediction, target)
 # </div>
 #
 # <hr style="height:2px;">
-
-# %% [markdown]
-# <div class="alert alert-block alert-info">
-#     <b>Task 1.2</b>: Fix in all the TODOs to make the validate function work. If confused, you can use this
-# <a href="https://pytorch.org/tutorials/beginner/basics/optimization_tutorial.html">PyTorch tutorial</a> as a template
-# </div>
 
 # %%
 # run validation after training epoch
@@ -412,10 +413,9 @@ validate(
 #     do the scores agree with your visual determination of which model was better?
 # </div>
 
-
 # %% [markdown]
 # <div class="alert alert-block alert-success">
-#     <h2>Checkpoint 3</h2>
+#     <h2>Checkpoint 1.2</h2>
 #
 # We have finished writing the evaluation function. We will go over the code up to this point soon.
 # Next we will work on augmentations to improve the generalization of our model.
@@ -425,7 +425,15 @@ validate(
 # <hr style="height:2px;">
 
 # %% [markdown]
-# PS: PyTorch already has quite a bunch of all possible data transforms, so if you need one, check
+# ## Section 2: Augmentation
+# Often our models will perform better on the evaluation dataset if we augment our training data.
+# This is because the model will be exposed to a wider variety of data that will hopefully help
+# cover the full distribution of data in the validation set. We will use the `torchvision.transforms`
+# to augment our data.
+
+
+# %% [markdown]
+# PS: PyTorch already has quite a few possible data transforms, so if you need one, check
 # [here](https://pytorch.org/vision/stable/transforms.html#transforms-on-pil-image-and-torch-tensor).
 # The biggest problem with them is that they are clearly separated into transforms applied to PIL 
 # images (remember, we initially load the images as PIL.Image?) and torch.tensors (remember, we 
@@ -450,16 +458,17 @@ show_random_dataset_image(augmented_data)
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-#     <b>Task 3.1</b>: Now retrain your model with your favorite augmented dataset. Did your model improve?
+#     <b>Task 2.1</b>: Now retrain your model with your favorite augmented dataset. Did your model improve?
 # </div>
 
 # %% [markdown]
 # <hr style="height:2px;">
 
 # %% [markdown]
-# ## Loss Function
-#
-# The next step to do would be writing a loss function - a metric that will tell us how
+# ## Section 3: Loss Functions
+
+# %% [markdown]
+# The next step to do would be to improve our loss function - the metric that tells us how
 # close we are to the desired output. This metric should be differentiable, since this
 # is the value to be backpropagated. The are
 # [multiple losses](https://lars76.github.io/2018/09/27/loss-functions-for-segmentation.html)
@@ -472,7 +481,7 @@ show_random_dataset_image(augmented_data)
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-#     <b>Task 2.2</b>: Implement your loss (or take one from pytorch):
+#     <b>Task 3.1</b>: Implement your loss (or take one from pytorch):
 # </div>
 
 # %%
@@ -514,6 +523,14 @@ except RuntimeError as e:
     print(e)
     print("Your loss does not support out-of-bounds predictions")
 
+# %% [markdown]
+# Pay close attention to whether your loss function can handle predictions outside of the range (0, 1).
+# If it can't, theres a good chance that the activation function requires a specific activation before
+# being passed into the loss function. This is a common source of bugs in DL models. For example, trying
+# to use the `torch.nn.BCELossWithLogits` loss function with a model that has a sigmoid activation will
+# result in abysmal performance, wheras using the `torch.nn.BCELoss` loss function with a model that has
+# no activation function will likely error out and fail to train.
+
 
 # %%
 # Now lets start experimenting. Start a tensorboard logger to keep track of experiments.
@@ -524,7 +541,7 @@ logger = SummaryWriter("runs/Unet")
 
 # %%
 # Use the unet you expect to work the best!
-model = unet
+model = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2, final_activation="Sigmoid")
 
 # use adam optimizer
 optimizer = torch.optim.Adam(model.parameters())
@@ -544,7 +561,7 @@ for epoch in range(n_epochs):
         optimizer=optimizer,
         loss_function=loss_function,
         epoch=epoch,
-        log_interval=5,
+        log_interval=25,
         tb_logger=logger,
     )
     step = epoch * len(train_loader)
@@ -590,7 +607,7 @@ for epoch in range(n_epochs):
 # %% [markdown]
 
 # <div class="alert alert-block alert-info">
-#     <b>Task BONUS 4.1</b>: Group Norm, update the U-Net to use a GroupNorm layer
+#     <b>Task BONUS.1</b>: Group Norm, update the U-Net to use a GroupNorm layer
 # </div>
 
 
@@ -658,7 +675,7 @@ for epoch in range(n_epochs):
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-#     <b>Task BONUS 4.2</b>: More Layers
+#     <b>Task BONUS.2</b>: More Layers
 # </div>
 
 # %%
@@ -708,7 +725,7 @@ for epoch in range(n_epochs):
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-#     <b>Task BONUS 4.3</b>: Dice Loss
+#     <b>Task BONUS.3</b>: Dice Loss
 #     Dice Loss is a simple inversion of the Dice Coefficient.
 #     We already have a Dice Coefficient implementation, so now we just
 #     need a layer that can invert it.
@@ -791,7 +808,7 @@ for epoch in range(n_epochs):
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-#     <b>Task BONUS 4.4</b>: Group Norm + Dice
+#     <b>Task BONUS.4</b>: Group Norm + Dice
 # </div>
 
 # %%
@@ -828,7 +845,7 @@ for epoch in range(n_epochs):
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-#     <b>Task BONUS 4.5</b>: Group Norm + Dice + U-Net 5 Layers
+#     <b>Task BONUS.5</b>: Group Norm + Dice + U-Net 5 Layers
 # </div>
 
 # %%
