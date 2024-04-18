@@ -311,16 +311,17 @@ from unet import UNet
 
 
 unet = UNet(
+
     depth=3,
     in_channels=1,
-    num_fmaps=64,
-    fmap_inc_factor=3,
-    downsample_factor=([2,2]),
-    kernel_size=3,
-    padding="same",
-    upsample_mode="nearest",
-    final_activation=torch.nn.Tanh(),
-    out_channels=1,
+    out_channels=1, 
+    final_activation='Tanh',
+    num_fmaps = 64,
+    fmap_inc_factor= 2,
+    downsample_factor= 2,
+    kernel_size= 3,
+    padding= "same",
+    upsample_mode= "nearest",
 )
 
 loss = torch.nn.MSELoss()
@@ -347,7 +348,7 @@ idx = np.random.randint(0, len(val_data))  # take a random sample
 image, mask = val_data[idx]  # get the image and the nuclei masks
 
 image = image.to(device)
-pred = unet(image)
+pred = unet(torch.unsqueeze(image, dim=0))
     
 image = np.squeeze(image.cpu())
 mask = np.squeeze(mask.cpu().numpy())
@@ -475,7 +476,7 @@ idx = np.random.randint(0, len(val_data))  # take a random sample
 image, mask = val_data[idx]  # get the image and the nuclei masks
 
 image = image.to(device)
-pred = unet(image)
+pred = unet(torch.unsqueeze(image, dim=0))
     
 image = np.squeeze(image.cpu())
 mask = np.squeeze(mask.cpu().numpy())
@@ -534,7 +535,7 @@ plt.show()
 # <b>Task 3.2</b>: evaluate for the validation dataset
 # </div>
 # %%
-from instance_utils import evaluate
+from local import evaluate
 # need to re-initialize the dataloader to return masks in addition to SDTs
 val_data = InstanceDataset("nuclei_val_data", transforms.RandomCrop(256), return_mask=True)
 val_loader = DataLoader(val_data, batch_size=5)
@@ -584,7 +585,7 @@ for idx, (image, mask, sdt) in enumerate(val_loader):
 
 #%%
 # create a new dataset for affinities
-from instance_utils import erode_border, compute_affinities
+from local import compute_affinities
 class affinityDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
