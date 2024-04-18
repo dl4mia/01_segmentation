@@ -3,30 +3,25 @@
 #
 # <hr style="height:2px;">
 #
-# - So far we were only interested in semantic classes, e.g. foreground / background, cell types, person / car, etc. 
-# But in many cases we not only want to know if a certain pixel belongs to an object, but also to which unique object.
+# - So far, we were only interested in `semantic` classes, e.g. foreground / background, cell types, person / car, etc. 
+# But in many cases we not only want to know if a certain pixel belongs to an object, but also to which unique object (i.e. the task of `instance segmentation`).
 #
-# - For isolated objects, this is trivial, all connected foreground pixels form one instance, yet often instances 
-# are very close together or even overlapping. Thus we need to think a bit more how to formulate the inputs / loss 
-# of our network
+# - For isolated objects, this is trivial, all connected foreground pixels form one instance, yet often instances are very close together or even overlapping. Thus we need to think a bit more how to formulate the targets / loss of our network.
 #
-# - Further, in instance segmentation the specific value of each label is arbitrary
+# - Further, in instance segmentation the specific value of each label is arbitrary. Here, `Mask 1` and `Mask 2` below would be equivalent even though the values of pixels on individual cells is different.
 #
-# Manan's Image
+# | Image | Mask 1| Mask 2|
+# | :-: | :-: | :-: |
+# | ![image](static/01_instance_img.png) | ![mask1](static/02_instance_teaser.png) | ![mask2](static/03_instance_teaser.png) |
 #
-# - Therefore we must devise an auxilliary task to train the model on, which we then can post-process into our final 
-# instance segmentation
-
-# %% [markdown]
-# <div class="alert alert-danger">
-# Use the segmentation environment
-# </div>
+#
+# - Therefore we must devise an auxilliary task to train the model on, which we then can post process into our final instance segmentation.
 
 # %% [markdown]
 # <hr style="height:2px;">
 #
 # ## Import Packages
-#%%
+# %%
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -54,8 +49,12 @@ assert torch.cuda.is_available()
 # %% [markdown]
 # <hr style="height:2px;">
 #
-# ## Section 1: Signed Distance Transform
-# what is the signed distance transform, with image examples
+# ## Section 1: Signed Distance Transform (SDT)
+# What is the signed distance transform?
+
+# %% [markdown]
+# ![image](static/04_instance_sdt.png)
+#
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
@@ -118,14 +117,14 @@ _ = [ax.axis("off") for ax in axarr]  # remove the axes
 print("Image size is %s" % {img[0].shape})
 plt.show()
 
-#%% tags [markdown]
+# %% tags [markdown]
 # Questions
 # 1. Why do we need to normalize the distances between -1 and 1?
 #   -
 # 2. What is the effect of changing the scale value? What do you think is a good default value?
 #   -
 
-#%% [markdown] tags=["solution"]
+# %% [markdown] tags=["solution"]
 # Questions
 # 1. Why do we need to normalize the distances between -1 and 1?
 #   -
@@ -141,7 +140,7 @@ plt.show()
 #       - Think about the order transformations are applied to the mask/SDT
 # </div>
 
-#%% 
+# %%
 class InstanceDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
@@ -194,7 +193,7 @@ class InstanceDataset(Dataset):
        # fill in function
 
         return 
-#%% tags=["solution"]
+# %% tags=["solution"]
 class InstanceDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
@@ -245,12 +244,12 @@ class InstanceDataset(Dataset):
         sdt_target = transforms.ToTensor()(sdt_target_array)
         return sdt_target.float()
 
-#%% [markdown]
+# %% [markdown]
 # ### Test your function
 # - Create training and validation datasets and data loaders
 # - use `show_random_dataset_image` to verify that your dataset solution is correct
 #   - output should show 2 images: the raw image and the SDT matching the one shown in task 1.1
-# %% 
+# %%
 from local import show_random_dataset_image
 
 train_data = InstanceDataset("nuclei_train_data", transforms.RandomCrop(256))
@@ -264,11 +263,11 @@ show_random_dataset_image(train_data)
 # <div class="alert alert-block alert-info">
 # <b>Task 1.3</b>: Train the Unet
 # </div>
-#%% [markdown]
+# %% [markdown]
 #   - loss function hint: [torch losses](https://pytorch.org/docs/stable/nn.html#loss-functions)
 #   - optimizer hint: [torch optimizers](https://pytorch.org/docs/stable/optim.html)
 
-#%% 
+# %%
 
 from local import train
 import torch
@@ -282,7 +281,7 @@ from unet import UNet
 
 # write a training loop and train for 10 epochs
 
-#%% tags=["solution"]
+# %% tags=["solution"]
 from local import train
 from unet import UNet
 
@@ -311,7 +310,7 @@ for epoch in range(5):
         device="cpu", # make sure to set to cuda
     )
 
-#%% [markdown]
+# %% [markdown]
 # Here we will run inference using our trained model
 
 # %%
@@ -353,7 +352,7 @@ plt.show()
 # %% [markdown]
 # hint: look at the imports
 # hint: it is possible to write this function by only adding 2 lines
-# %% 
+# %%
 from scipy.ndimage import label, maximum_filter
 
 def find_local_maxima(distance_transform, min_seed_distance):
@@ -364,7 +363,7 @@ def find_local_maxima(distance_transform, min_seed_distance):
     seeds, n = label(...)
 
     return seeds, n
-#%% tags=["solution"]
+# %% tags=["solution"]
 from scipy.ndimage import label, maximum_filter
 def find_local_maxima(distance_transform, min_seed_distance):
     max_filtered = maximum_filter(distance_transform, min_seed_distance)
@@ -375,7 +374,7 @@ def find_local_maxima(distance_transform, min_seed_distance):
 
 # %% [markdown]
 # We now use this function to find the seeds for the watershed
-# %% 
+# %%
 from skimage.segmentation import watershed
 
 def watershed_from_boundary_distance(
@@ -411,7 +410,7 @@ def get_boundary_mask(pred, threshold):
 # <b>Task 2.2</b>: get the watershed segmentation
 # </div>
 
-# %% 
+# %%
 idx = np.random.randint(0, len(val_data))  # take a random sample
 image, mask = val_data[idx]  # get the image and the nuclei masks
 
@@ -470,7 +469,7 @@ axarr[2].imshow((seg))
 _ = [ax.axis("off") for ax in axarr]  # remove the axes
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # Questions:
 # 1. what is the effect of the min_seed_distance parameter in watershed? 
 #   - experiment with different values
@@ -485,18 +484,18 @@ plt.show()
 # ## Section 3: Evaluation
 # Which evaluation metric should we use
 # Use this website to pick a good one
-
-https://metrics-reloaded.dkfz.de/problem-category-selection
-
+#
+# https://metrics-reloaded.dkfz.de/problem-category-selection
+#
 # Which metric do you think is best for this dataset
-
+#
 # 3 -5 example problems with images, want them to choose which metric is best for each
-
+#
 # 1. cells that are mostly round, but have long protrusions, where our goal is to quantify the number of protrusions
-
+#
 # 2. mixed population of 2 cells, where our goal is to segment 
 # 1 population form the other and count the number of cells of that population
-
+#
 # 3. Cells with many small specs where the goal is to segment and count the number of specs
 
 
@@ -504,7 +503,13 @@ https://metrics-reloaded.dkfz.de/problem-category-selection
 # <hr style="height:2px;">
 #
 # ## Section 4: Affinities
-#%%
+# %% [markdown]
+# What are affinities?
+
+# %% [markdown]
+# ![image](static/05_instance_affinity.png)
+
+# %%
 def erode_border(labels, iterations, border_value):
     """Function to erode boundary pixels for mask and border."""
 
@@ -544,7 +549,7 @@ def erode_border(labels, iterations, border_value):
     border = labels - border
 
     return labels, border
-#%%
+# %%
 # add create affinities method to the dataset
 def compute_affinities(seg: np.ndarray, nhood: list):
 
@@ -571,7 +576,7 @@ def compute_affinities(seg: np.ndarray, nhood: list):
 
     return aff
 
-#%%
+# %%
 # visualize affinities
 idx = np.random.randint(0, len(train_data))  # take a random sample
 img, mask = train_data[idx]
@@ -584,7 +589,7 @@ axarr[0].imshow(img[0])  # show the image
 axarr[1].imshow((mask[0]), interpolation=None)  # show the masks
 axarr[2].imshow(affinities[0,0,:,:] + affinities[1,0,:,:])
 
-#%% [markdown]
+# %% [markdown]
 # make needed changes to the model
 # train model
 # post-processing
@@ -596,7 +601,7 @@ axarr[2].imshow(affinities[0,0,:,:] + affinities[1,0,:,:])
 # ## Section 5: Pre-Trained Models
 # try running cellpose from script
 
-#%%
+# %%
 import cellpose
 
 
