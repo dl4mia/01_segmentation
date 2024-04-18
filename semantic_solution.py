@@ -5,11 +5,13 @@
 #
 # In this notebook, we adapt our 2D U-Net for better nuclei segmentations in the Kaggle Nuclei dataset.
 #
+# TODO: Authorship?
+#
 # Written by Valentyna Zinchenko, Constantin Pape and William Patton.
 
 # %% [markdown]
 # <div class="alert alert-danger">
-# Please use kernel <code>05-semantic-segmentation</code> for this exercise.
+# Please use kernel <code>segmentation</code> for this exercise.
 # </div>
 
 # %% [markdown]
@@ -52,23 +54,23 @@ assert torch.cuda.is_available()
 # Lets go ahead and visualize some of the data along with some predictions to see how we are doing.
 
 
-# %% [markdown]
-# PS: PyTorch already has quite a bunch of all possible data transforms, so if you need one, check [here](https://pytorch.org/vision/stable/transforms.html#transforms-on-pil-image-and-torch-tensor). The biggest problem with them is that they are clearly separated into transforms applied to PIL images (remember, we initially load the images as PIL.Image?) and torch.tensors (remember, we converted the images into tensors by calling transforms.ToTensor()?). This can be incredibly annoying if for some reason you might need to transorm your images to tensors before applying any other transforms or you don't want to use PIL library at all.
-
 # %%
 from local import (
     NucleiDataset,
     show_random_dataset_image,
+    show_random_dataset_image_with_prediction,
     train,
 )
 from unet import UNet
+
+# %%
 
 train_data = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
 val_data = NucleiDataset("nuclei_val_data", transforms.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
-unet = UNet(1, 1, depth=4)
+unet = UNet(1, 1, 4, downsample_factors=[[2,2],[2,2],[2,2]], padding="same")
 loss = nn.MSELoss()
 optimizer = torch.optim.Adam(unet.parameters())
 
@@ -79,22 +81,37 @@ for epoch in range(10):
         optimizer,
         loss,
         epoch,
-        device="cuda",
+        device="cpu",
     )
+
+# %%
+
+def show_random_dataset_image_with_prediction(dataset, model, device="cpu"):
+    idx = np.random.randint(0, len(dataset))  # take a random sample
+    img, mask = dataset[idx]  # get the image and the nuclei masks
+    x = img.to(device).unsqueeze(0)
+    y = model(x)[0].detach().cpu().numpy()
+    f, axarr = plt.subplots(1, 3)  # make two plots on one figure
+    axarr[0].imshow(img[0])  # show the image
+    axarr[1].imshow(mask[0], interpolation=None)  # show the masks
+    axarr[2].imshow(y[0], interpolation=None)  # show the prediction
+    _ = [ax.axis("off") for ax in axarr]  # remove the axes
+    print("Image size is %s" % {img[0].shape})
+    plt.show()
 
 # %%
 # TODO: Implement a function to show a random image from the dataset with the prediction given a UNet
 show_random_dataset_image(train_data)
-# show_random_dataset_image_plus_prediction(train_data, unet)
+show_random_dataset_image_with_prediction(train_data, unet)
 
 # %%
 show_random_dataset_image(val_data)
-# show_random_dataset_image_plus_prediction(val_data, unet)
+show_random_dataset_image_with_prediction(val_data, unet)
 
 # %% [markdown]
 
 # <div class="alert alert-block alert-info">
-#     <p><b>Task 0.1: </b>: Are the predictions good enough? Take some time to try to think about
+#     <p><b>Task 0.1</b>: Are the predictions good enough? Take some time to try to think about
 #     what could be improved and how that could be addressed. If you have time try training a second
 #     model and see which one is better</p>
 # </div>
@@ -111,18 +128,23 @@ show_random_dataset_image(val_data)
 # %% [markdown] tags=["solution"]
 # Write your answers here:
 # <ol>
+#     <li> Evaluation metric for better understanding of model performance so we can compare. </li>
 #     <li> Augments for generalization to validaiton. </li>
 #     <li> Loss function for better performance on lower prevalence classes. </li>
-#     <li> Evaluation metric for better understanding of model performance so we can compare. </li>
 # </ol>
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
 # <h2> Checkpoint 0 </h2>
-# <p>We will go over the steps up to this point soon. By this point you should have importend and re-used
+# <p>We will go over the steps up to this point soon. By this point you should have imported and re-used
 # code from previous exercises to train a basic UNet.</p>
 # <p>The rest of this exercise will focus on tailoring our network to semantic segmentation to improve
-# performance. The main areas we will tackle are 1) Evaluation, 2) Augmentation, and 3) Activations/Loss Functions</p>
+# performance. The main areas we will tackle are:</p>
+# <ol>
+#   <li> Evaluation
+#   <li> Augmentation
+#   <li> Activations/Loss Functions
+# </ol>
 #
 # </div>
 
@@ -132,8 +154,11 @@ show_random_dataset_image(val_data)
 # ## Section 1: Evaluation
 
 # %% [markdown]
+# One of the most important parts of training a model is evaluating it. We need to know how well our model is doing and if it is improving.
+# We will start by implementing a metric to evaluate our model. Evaluation is always specific to the task, in this case semantic segmentation.
 # We will use the [Dice Coefficient](https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient) to evaluate the network predictions.
-# We can use it for validation if we interpret set $a$ as predictions and $b$ as labels. It is often used to evaluate segmentations with sparse foreground, because the denominator normalizes by the number of foreground pixels.
+# We can use it for validation if we interpret set $a$ as predictions and $b$ as labels. It is often used to evaluate segmentations with sparse
+# foreground, because the denominator normalizes by the number of foreground pixels.
 # The Dice Coefficient is closely related to Jaccard Index / Intersection over Union.
 # %% [markdown]
 # <div class="alert alert-block alert-info">
@@ -210,17 +235,21 @@ assert dice(wrong_prediction, target) == 0.0, dice(wrong_prediction, target)
 
 # %% [markdown] tags=["solution"]
 # Answer:
-# 1) Score remains between (0,1) with 0 being the worst score and 1 being the best. This case essentially gives you the Dice Loss and can be a good alternative to cross entropy.
+# 1) Score remains between (0,1) with 0 being the worst score and 1 being the best. This case
+# essentially gives you the Dice Loss and can be a good alternative to cross entropy.
 #
-# 2) Scores will fall in the range of [-1,1]. Overly confident scores will be penalized i.e. if the target is `[0,1]` then a prediction of `[0,2]` will score higher than a prediction of `[0,3]`.
+# 2) Scores will fall in the range of [-1,1]. Overly confident scores will be penalized i.e.
+# if the target is `[0,1]` then a prediction of `[0,2]` will score higher than a prediction of `[0,3]`.
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 2</h2>
 #
-# This is a good place to stop for a moment. If you have extra time look into some extra evaluation functions or try to implement your own without hints.
+# This is a good place to stop for a moment. If you have extra time look into some extra
+# evaluation functions or try to implement your own without hints.
 # Some popular alternatives to the Dice Coefficient are the Jaccard Index and Balanced F1 Scores.
-# You may even have time to compute the evaluation score between some of your training and validation predictions to their ground truth using our previous models.
+# You may even have time to compute the evaluation score between some of your training and
+# validation predictions to their ground truth using our previous models.
 #
 # </div>
 #
@@ -228,7 +257,8 @@ assert dice(wrong_prediction, target) == 0.0, dice(wrong_prediction, target)
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-#     <b>Task 1.2</b>: Fix in all the TODOs to make the validate function work. If confused, you can use this <a href="https://pytorch.org/tutorials/beginner/basics/optimization_tutorial.html">PyTorch tutorial</a> as a template
+#     <b>Task 1.2</b>: Fix in all the TODOs to make the validate function work. If confused, you can use this
+# <a href="https://pytorch.org/tutorials/beginner/basics/optimization_tutorial.html">PyTorch tutorial</a> as a template
 # </div>
 
 # %%
@@ -360,16 +390,16 @@ def validate(
 
 # %% [markdown]
 # <div class="alert alert-block alert-warning">
-#     Quick sanity check for your train function to make sure no errors are thrown
+#     Quick sanity check for your validate function to make sure no errors are thrown
 # </div>
 
 # %%
-simple_net = UNet(1, 1, depth=1, final_activation=None)
+# simple_net = UNet(1, 1, depth=1, final_activation=None)
 
 # build the dice coefficient metric
 
 validate(
-    simple_net,
+    unet,
     train_loader,
     loss_function=torch.nn.MSELoss(),
     metric=DiceCoefficient(),
@@ -395,13 +425,13 @@ validate(
 # <hr style="height:2px;">
 
 # %% [markdown]
-# PS: PyTorch already has quite a bunch of all possible data transforms,
-# so if you need one, check [here](https://pytorch.org/vision/stable/transforms.html#transforms-on-pil-image-and-torch-tensor).
-# The biggest problem with them is that they are clearly separated into transforms applied to PIL
-# images (remember, we initially load the images as PIL.Image?) and torch.tensors (remember, we converted
-# the images into tensors by calling transforms.ToTensor()?). This can be incredibly annoying if for
-# some reason you might need to transorm your images to tensors before applying any other transforms
-# or you don't want to use PIL library at all.
+# PS: PyTorch already has quite a bunch of all possible data transforms, so if you need one, check
+# [here](https://pytorch.org/vision/stable/transforms.html#transforms-on-pil-image-and-torch-tensor).
+# The biggest problem with them is that they are clearly separated into transforms applied to PIL 
+# images (remember, we initially load the images as PIL.Image?) and torch.tensors (remember, we 
+# converted the images into tensors by calling transforms.ToTensor()?). This can be incredibly
+# annoying if for some reason you might need to transorm your images to tensors before applying any
+# other transforms or you don't want to use PIL library at all.
 
 # %% [markdown]
 # Here is an example augmented dataset. Use it to see how it affects your data, then play around with at least
@@ -429,9 +459,16 @@ show_random_dataset_image(augmented_data)
 # %% [markdown]
 # ## Loss Function
 #
-# The next step to do would be writing a loss function - a metric that will tell us how close we are to the desired output. This metric should be differentiable, since this is the value to be backpropagated. The are [multiple losses](https://lars76.github.io/2018/09/27/loss-functions-for-segmentation.html) we could use for the segmentation task.
+# The next step to do would be writing a loss function - a metric that will tell us how
+# close we are to the desired output. This metric should be differentiable, since this
+# is the value to be backpropagated. The are
+# [multiple losses](https://lars76.github.io/2018/09/27/loss-functions-for-segmentation.html)
+# we could use for the segmentation task.
 #
-# Take a moment to think which one is better to use. If you are not sure, don't forget that you can always google! Before you start implementing the loss yourself, take a look at the [losses](https://pytorch.org/docs/stable/nn.html#loss-functions) already implemented in PyTorch. You can also look for implementations on GitHub.
+# Take a moment to think which one is better to use. If you are not sure, don't forget
+# that you can always google! Before you start implementing the loss yourself, take a look
+# at the [losses](https://pytorch.org/docs/stable/nn.html#loss-functions) already implemented
+# in PyTorch. You can also look for implementations on GitHub.
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
@@ -484,6 +521,7 @@ except RuntimeError as e:
 logger = SummaryWriter("runs/Unet")
 # %tensorboard --logdir runs
 
+
 # %%
 # Use the unet you expect to work the best!
 model = unet
@@ -515,17 +553,20 @@ for epoch in range(n_epochs):
 
 
 # %% [markdown]
-# Your validation metric was probably around 85% by the end of the training. That sounds good enough, but an equally important thing to check is:
-# Open the Images tab in your Tensorboard and compare predictions to targets. Do your predictions look reasonable? Are there any obvious failure cases?
-# If nothing is clearly wrong, let's see if we can still improve the model performance by changing the model or the loss
+# Your validation metric was probably around 85% by the end of the training. That sounds good enough,
+# but an equally important thing to check is: Open the Images tab in your Tensorboard and compare
+# predictions to targets. Do your predictions look reasonable? Are there any obvious failure cases?
+# If nothing is clearly wrong, let's see if we can still improve the model performance by changing
+# the model or the loss
 #
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 3</h2>
 #
-# This is the end of the guided exercise. We will go over all of the code up until this point shortly. While you wait you are encouraged to try alternative loss functions, evaluation metrics, augmentations, and networks.
-# After this come additional exercises if you are interested and have the time.
+# This is the end of the guided exercise. We will go over all of the code up until this point shortly.
+# While you wait you are encouraged to try alternative loss functions, evaluation metrics, augmentations,
+# and networks. After this come additional exercises if you are interested and have the time.
 #
 # </div>
 # <hr style="height:2px;">
@@ -537,10 +578,13 @@ for epoch in range(n_epochs):
 #     * use [GroupNorm](https://pytorch.org/docs/stable/nn.html#torch.nn.GroupNorm) to normalize convolutional group inputs
 #     * use more layers in your U-Net.
 #
-# 2. Use the Dice Coefficient as loss function. Before we only used it for validation, but it is differentiable and can thus also be used as loss. Compare to the results from exercise 2.
-# Hint: The optimizer we use finds minima of the loss, but the minimal value for the Dice coefficient corresponds to a bad segmentation. How do we need to change the Dice Coefficient to use it as loss nonetheless?
+# 2. Use the Dice Coefficient as loss function. Before we only used it for validation, but it is differentiable
+# and can thus also be used as loss. Compare to the results from exercise 2.
+# Hint: The optimizer we use finds minima of the loss, but the minimal value for the Dice coefficient corresponds
+# to a bad segmentation. How do we need to change the Dice Coefficient to use it as loss nonetheless?
 #
-# 3. Compare the results of these trainings to the first one. If any of the modifications you've implemented show better results, combine them (e.g. add both GroupNorm and one more layer) and run trainings again.
+# 3. Compare the results of these trainings to the first one. If any of the modifications you've implemented show
+# better results, combine them (e.g. add both GroupNorm and one more layer) and run trainings again.
 # What is the best result you could get?
 
 # %% [markdown]
