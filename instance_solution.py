@@ -30,6 +30,8 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+device = 'cpu'
+
 #from torch.utils.tensorboard import SummaryWriter
 #from torchsummary import summary
 from tqdm import tqdm
@@ -67,7 +69,7 @@ def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
 
     distance = np.tanh(distance / scale)
 
-    return distance
+    return distance.astype(float)
 
 #%%
 # small box to visualize the signed distance transform
@@ -126,7 +128,7 @@ class InstanceDataset(Dataset):
         image = Image.open(img_path)
         image = self.inp_transforms(image)
         mask_path = os.path.join(self.root_dir, self.samples[idx], "mask.tif")
-        mask = transforms.ToTensor()(Image.open(mask_path))
+        mask = Image.open(mask_path)
         if self.transform is not None:
             # Note: using seeds to ensure the same random transform is applied to
             # the image and mask
@@ -141,8 +143,9 @@ class InstanceDataset(Dataset):
         return image, sdt_mask
     
     def create_sdt_target(self, mask):
-        sdt_target = compute_sdt(mask, constant=0.5, scale=5)
-        return sdt_target
+        sdt_target_array = compute_sdt(mask, constant=0.5, scale=5)
+        sdt_target = transforms.ToTensor()(sdt_target_array)
+        return sdt_target.float()
 
 #%%
 # Adjust the Unet to this new prediction
@@ -161,21 +164,29 @@ show_random_dataset_image(train_data)
 
 #%%
 # add the augmentations that you want
-unet = UNet()
+unet = UNet(
+    in_channels=1,
+    num_fmaps=64,
+    fmap_inc_factors=3,
+    downsample_factors=[(2,2)],
+    num_fmaps_out=1,
+    padding='same'
+)
 
 # choose a loss function (here are a few options to consider)
-loss = torch.nn.BCELoss()
+loss = torch.nn.MSELoss()
 
 optimizer = torch.optim.Adam(unet.parameters())
 
-for epoch in range(10):
+for epoch in range(5):
     train(
         unet,
         train_loader,
         optimizer,
         loss,
         epoch,
-        device="cuda",
+        log_interval=1,
+        device="cpu", # make sure to set to cuda
     )
 
 #%% 
@@ -183,6 +194,22 @@ for epoch in range(10):
 # evaluate model and plot resulting distance transform
 
 # This looks good, but it isn't quite what we want yet
+
+#%% 
+# set model to evaluate and visualize the output
+
+idx = np.random.randint(0, len(val_data))  # take a random sample
+img, mask = val_data[idx]  # get the image and the nuclei masks
+
+# make prediction off of mask
+unet.eval()
+prediction = unet(torch.unsqueeze(img, dim=0))
+f, axarr = plt.subplots(1, 3)  # make two plots on one figure
+axarr[0].imshow(img[0])  # show the image
+axarr[1].imshow((mask[0]), interpolation=None)  # show the masks
+axarr[2].imshow(prediction.cpu().detach().numpy()[0][0]) #
+_ = [ax.axis("off") for ax in axarr]  # remove the axes
+plt.show()
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
@@ -195,8 +222,9 @@ for epoch in range(10):
 # How do we get seed points?
 
 #%%
-from scipy.ndimage import label_cc, maximum_filter
-from scipy.segmentation import watershed
+from scipy.ndimage import label, maximum_filter
+from skimage.segmentation import watershed
+
 
 def watershed_from_boundary_distance(
         boundary_distances: np.ndarray,
@@ -210,7 +238,7 @@ def watershed_from_boundary_distance(
     # make them write a function to find maximum values?
     max_filtered = maximum_filter(boundary_distances, min_seed_distance)
     maxima = max_filtered==boundary_distances
-    seeds, n = label_cc(maxima)
+    seeds, n = label(maxima)
 
     if n == 0:
         return np.zeros(boundary_distances.shape, dtype=np.uint64), id_offset
@@ -228,30 +256,45 @@ def watershed_from_boundary_distance(
 def get_boundary_mask(pred, threshold):
     boundary_mask = pred > threshold
     return boundary_mask
+
 #%%
-net.eval()
-for idx, (image, mask) in enumerate(val_loader):
-    image = image.to(device)
-    logits = net(image)
-    pred = activation(logits)
-        
-    image = np.squeeze(image.cpu())
-    mask = np.squeeze(mask.cpu().numpy())
-        
-    pred = np.squeeze(pred.cpu().detach().numpy())
-    
-    # feel free to try different thresholds
-    thresh = np.mean(pred)
-    
-    # get boundary mask
-    boundary_mask = get_boundary_mask(pred, thresh=thresh)
+#unet.eval()
+idx = np.random.randint(0, len(val_data))  # take a random sample
+image, mask = val_data[idx]  # get the image and the nuclei masks
 
-    seg = watershed_from_boundary_distance(
-        pred,
-        boundary_mask,
-        id_offset=0
-        min_seed_distance=10)
+image = image.to(device)
+#pred = unet(image)
+    
+image = np.squeeze(image.cpu())
+mask = np.squeeze(mask.cpu().numpy())
+    
+#pred = np.squeeze(pred.cpu().detach().numpy())
+pred = mask
 
+# feel free to try different thresholds
+thresh = np.mean(pred)
+
+
+# get boundary mask
+boundary_mask = get_boundary_mask(pred, threshold=thresh)
+
+
+seg = watershed_from_boundary_distance(
+    pred,
+    boundary_mask,
+    id_offset=0,
+    min_seed_distance=5)
+
+f, axarr = plt.subplots(1, 3)  # make two plots on one figure
+axarr[0].imshow(image)  # show the image
+axarr[1].imshow((mask), interpolation=None)  # show the masks
+axarr[2].imshow((seg))
+_ = [ax.axis("off") for ax in axarr]  # remove the axes
+plt.show()
+
+#%% [markdown]
+# 1. what is the effect of the min_seed_distance parameter in watershed? 
+# try really high and really low values
 
 # %% [markdown]
 # <hr style="height:2px;">
@@ -279,6 +322,46 @@ https://metrics-reloaded.dkfz.de/problem-category-selection
 #
 # ## Section 4: Affinities
 #%%
+def erode_border(labels, iterations, border_value):
+    """Function to erode boundary pixels for mask and border."""
+
+    # copy labels to memory, create border array
+    labels = np.copy(labels)
+    border = np.array(labels)
+
+    # create zeros array for foreground
+    foreground = np.zeros_like(labels, dtype=bool)
+
+    # loop through unique labels
+    for label in np.unique(labels):
+
+        # skip background
+        if label == 0:
+            continue
+
+        # mask to label
+        label_mask = labels == label
+
+        # erode labels
+        eroded_mask = binary_erosion(
+                label_mask,
+                iterations=iterations,
+                border_value=border_value)
+
+        # get foreground
+        foreground = np.logical_or(eroded_mask, foreground)
+
+    # and background...
+    background = np.logical_not(foreground)
+
+    # set eroded pixels to zero
+    labels[background] = 0
+
+    # get eroded pixels
+    border = labels - border
+
+    return labels, border
+#%%
 # add create affinities method to the dataset
 def compute_affinities(seg: np.ndarray, nhood: list):
 
@@ -305,6 +388,20 @@ def compute_affinities(seg: np.ndarray, nhood: list):
 
     return aff
 
+#%%
+# visualize affinities
+idx = np.random.randint(0, len(train_data))  # take a random sample
+img, mask = train_data[idx]
+
+labels, border = erode_border(mask, iterations=1, border_value=1)
+affinities = compute_affinities(labels, nhood=[[0,1], [1,0]])
+
+f, axarr = plt.subplots(1, 3)  # make two plots on one figure
+axarr[0].imshow(img[0])  # show the image
+axarr[1].imshow((mask[0]), interpolation=None)  # show the masks
+axarr[2].imshow(affinities[0,0,:,:] + affinities[1,0,:,:])
+
+#%% [markdown]
 # make needed changes to the model
 # train model
 # post-processing
