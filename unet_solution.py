@@ -14,12 +14,8 @@
 
 # %% [markdown]
 # TODOS:
-# - Test for crop and concat
 # - Test shape of outputs for different blocks
-# - Better explain unet implementation where each element of list is a layer (good scaffolding)
 # - Create solution tags and empty scaffolding
-# - Introduce dataset and segmentation in one cell
-# - Better training tasks
 
 # %% [markdown]
 # <hr style="height:2px;">
@@ -47,6 +43,17 @@ import unet_tests
 # make sure gpu is available. Please call a TA if this cell fails
 # assert torch.cuda.is_available()
 
+
+# %% [markdown]
+# ## The Dataset
+# For our segmentation exercises, we will be using a nucleus segmentation dataset from [Kaggle 2018 Data Science Bowl](https://www.kaggle.com/c/data-science-bowl-2018/data). We have pre-downloaded the dataset to the shared drive and provded a pytorch Dataset called `NucleiDataset` to use for training. In this exercise, we will create a U-Net and train it to classify foreground and background, but focus on the U-Net itself - you will learn more about semantic segmentation in the next exercise.
+# Below, we visualize create a dataset and then visualize a random image. You can rerun the visualization cell to see multiple examples.
+
+# %%
+dataset = NucleiDataset("nuclei_train_data")
+
+# %%
+show_random_dataset_image(dataset)
 
 # %% [markdown]
 # <hr style="height:2px;">
@@ -384,7 +391,7 @@ unet_tests.TestOutputConv(OutputConv).run()
 # <hr style="height:2px;">
 
 # %% [markdown]
-# ## Putting the UNet together
+# ## Putting the U-Net together
 #
 # Now we will make a U-Net class that combines all of these components as shown in the image. This image shows a U-Net of depth 5 with specific input channels, feature maps, upsampling, and final activation. Ours will be configurable with regards to depth and other features.
 # ![image](static/UNet_figure.png)
@@ -393,8 +400,12 @@ unet_tests.TestOutputConv(OutputConv).run()
 # %% [markdown]
 # <div class="alert alert-block alert-info">
 #     <b>Task 6:</b> U-Net Implementation
+#     <p>Now we will implement our U-Net! We have written some of it for you - follow the steps below to fill in the missing parts.</p>
 #     <ol>
-#         <li>TODO: list what they need to implement specifically</li>
+#         <li>Write the helper functions <code>compute_fmaps_encoder</code> and <code>compute_fmaps_decoder</code> that compute the number of input and output feature maps at each level of the U-Net.</li>
+#         <li>Declare a list of encoder (left) and decoder (right) ConvPasses depending on your depth using the helper functions you wrote above. Consider the special case at the bottom of the U-Net carefully!</li>
+#         <li>Declare an Upsample, Downsample, CropAndConcat, and OutputConv block.</li>
+#         <li>Implement the <code>forward</code> function, applying the modules you declared above in the proper order.</li>
 #         </ol>
 # </div>
 
@@ -431,8 +442,8 @@ class UNet(torch.nn.Module):
                 The number of feature maps in the first layer. Defaults to 64.
             fmap_inc_factor (optional):
                 By how much to multiply the number of feature maps between
-                layers. Layer ``l`` will have ``num_fmaps*fmap_inc_factor**l`` 
-                feature maps. Defaults to 2.
+                layers. Encoder layer ``l`` will have ``num_fmaps*fmap_inc_factor**l`` 
+                output feature maps. Defaults to 2.
             downsample_factor (optional):
                 Factor to use for down- and up-sampling the feature maps between layers.
                 Defaults to 2.
@@ -561,19 +572,14 @@ class UNet(torch.nn.Module):
         return self.final_conv(layer_input)
 
 
+# %% [markdown]
+# Below we declare a very simple U-Net and then apply it to a random image. Because we have not trained the U-Net the output should look similar to the output of random convolutions. If you get errors here, go back and fix your U-Net implementation!
+
 # %%
 unet_tests.TestUNet(UNet).run()
 
 # %%
-simple_net = UNet(
-        depth=2,
-        in_channels=1,
-        num_fmaps=12,
-        fmap_inc_factor=3,
-        downsample_factor=2,
-        kernel_size=3,
-        padding="valid",
-        upsample_mode="nearest",)
+simple_net = UNet(depth=2, in_channels=1)
 
 # %%
 apply_and_show_random_image(simple_net)
@@ -583,7 +589,7 @@ apply_and_show_random_image(simple_net)
 #
 # The receptive field of a U-Net is the set of input pixels that contribute to a specific output pixel.
 #
-# The receptive field of a single 3x3 convolution is simply the 3x3 grid of inputs. Each subsequent convolution adds the (kernel size - 1) to the receptive field, so two 3x3 convolutions have a 5x5 receptive field for each output pixel.
+# The receptive field of a single 3x3 convolution is simply the 3x3 grid of inputs. Each subsequent convolution adds the kernel size - 1 to the receptive field, so two 3x3 convolutions have a 5x5 receptive field for each output pixel.
 #
 # Downsampling increases the receptive field as well. After 2x2 max pooling, a 3x3 convolution has a receptive field of 6x6 pre-downsampled pixels. Every operation further increases the receptive field, so the final receptive field of a U-Net output depends on the depth, kernel size, and downsample factor.
 #
@@ -603,10 +609,13 @@ plot_receptive_field(new_net)
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 2</h2>
 #
-# We are about ready to start training! But before we do, we will stop and discuss your guesses.
+# We are about ready to start training! But before we do, we will stop and discuss your implementation.
 #
 # Questions to consider:
-# TODO
+# <ol>
+#     <li>Which feature of the U-Net has most effect on the receptive field?</li>
+#     <li>TODO</li>
+# </ol>
 #
 # </div>
 #
@@ -614,22 +623,13 @@ plot_receptive_field(new_net)
 
 # %% [markdown]
 # ## Train a U-Net!
-# We will get more into the details of evaluating semantic segmentation models in the next exercise. For now, we will provide an example pipeline that will train a U-Net to classify each pixel in an image of cells as foreground or background.
-
-# %% [markdown]
-# ### Dataset
-# For our segmentation exercises, we will be using a nucleus segmentation dataset from [Kaggle 2018 Data Science Bowl](https://www.kaggle.com/c/data-science-bowl-2018/data). We have pre-downloaded the dataset to the shared drive and provded a pytorch Dataset called `NucleiDataset` to use for training. In this exercise, we will do semantic segmentation and train a model to classify foreground and background, but you will learn more about this task in the next exercise.
-# Below, we visualize five examples of input data and foreground mask.
+# We will get more into the details of evaluating semantic segmentation models in the next exercise. For now, we will provide an example pipeline that will train a U-Net to classify each pixel in an image of cells as foreground or background. You should have seen training loops like this in the pre-course exercises, so there is no implementation task here.
+#
+# We will use Tensorboard to log our training runs, so there is code in the train loop to log aspects of the training to Tensorboard.
 
 # %%
-from torchvision import transforms
-
-dataset = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
-for i in range(5):
-    show_random_dataset_image(dataset)
-
-# %%
-train_loader = DataLoader(dataset)
+train_dataset = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
+train_loader = DataLoader(train_dataset)
 
 # %% tags=["solution"]
 loss_function: torch.nn.Module = torch.nn.MSELoss()
@@ -685,6 +685,7 @@ def train(
 
         # apply model and calculate loss
         prediction = model(x)
+        # if necessary, crop the masks to match the model output shape
         if prediction.shape != y.shape:
             y = crop(y, prediction)
         loss = loss_function(prediction, y)
@@ -730,25 +731,35 @@ def train(
             break
 
 
-# %%
-# start a tensorboard writer
-logger = SummaryWriter("runs/Unet")
-# %tensorboard --logdir runs
+# %% [markdown]
+# Now we start our Tensorboard server and show it inside the notebook.
 
 # %%
-# Here is where students can define their own unet with whatever parameters they want to try,
-# or use one of the examples from the thought exercise
-model = UNet(depth=4,
-        in_channels=1)
+# start a tensorboard writer
+# %tensorboard --logdir runs
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 7:</b> Declare and train a U-Net
+#     <ol>
+#         <li>Declare a U-Net with your favorite parameters!</li>
+#         <li>Train the U-Net for 5 epochs, and inspect the training loss and the output predictions in Tensorboard.</li>
+#         </ol>
+# </div>
+
+# %%
+model = UNet(depth=4, in_channels=1)
+model_name = "my_fav_unet"  # This name will be used in the tensorboard logs
+logger = SummaryWriter(f"runs/{model_name}")
 
 # %%
 # use adam optimizer
 optimizer = torch.optim.Adam(model.parameters())
 
-# train for $25$ epochs
+# train for $5$ epochs
 # during the training you can inspect the
 # predictions in the tensorboard
-n_epochs = 25
+n_epochs = 5
 for epoch in range(n_epochs):
     # train
     train(
@@ -762,14 +773,21 @@ for epoch in range(n_epochs):
 
 
 # %% [markdown]
-# TODO: Make them try a drastic variation to understand the importance of some aspect of the network (e.g. no skip connections, one layer, etc.). Might make sense to explain activation functions if we want them to use non-relu ones later.
+# <div class="alert alert-block alert-info">
+#     <b>Task 7:</b> Train more U-Nets!
+#     <ol>
+#         <li>Declare a new U-Net with different parameters.</li>
+#         <li>Train your new U-Net - does it perform better or worse? How can you tell?</li>
+#         <li>Keep tinkering with different architectures until the end of the exercise!</li>
+#         </ol>
+# </div>
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 3</h2>
 #
-# This is the end of the guided exercise. We will go over all of the code up until this point shortly. While you wait you are encouraged to try alternative loss functions, evaluation metrics, augmentations, and networks.
-# After this come additional exercises if you are interested and have the time.
-#
+# This is the end of the guided exercise. We will go over all of the code up until this point shortly. While you wait you are encouraged to try different U-Nets, training epochs, etc.
 # </div>
 # <hr style="height:2px;">
+
+# %%
