@@ -13,10 +13,6 @@
 # </div>
 
 # %% [markdown]
-# TODOS:
-# - Create solution tags and empty scaffolding
-
-# %% [markdown]
 # <hr style="height:2px;">
 #
 # ## The libraries
