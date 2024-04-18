@@ -287,18 +287,16 @@ unet_tests.TestConvBlock(ConvBlock).run()
 # %% [markdown]
 # ### Component 4: Skip Connections and Concatenation
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # The skip connections between the left and right side of the U-Net are central to successfully obtaining high-resolution output. At each layer, the output of the left conv block is concatenated to the output of the upsample block on the right side from the last layer below. Since upsampling, especially with the "nearest" algorithm, does not actually add high resolution information, the concatenation of the right side conv block output is crucial to generate high resolution segmentations.
 #
 # If the convolutions in the U-Net are valid, the right side will be smaller than the left side, so the right side output must be cropped before concatenation. We provide a helper function to do this cropping. 
-#
-# TODO: Add test
 
 
 # %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
 #     <b>Task 4:</b> Implement a CropAndConcat module
-#     <p>Below, you must implement the forward algorithm, including the cropping (using the provided helper function <code>self.crop</code>) and the concatenation (using <a href=https://pytorch.org/docs/stable/generated/torch.cat.html#torch.cat>torch.cat</a>).
+#     <p>Below, you must implement the <code>forward</code> method, including the cropping (using the provided helper function <code>self.crop</code>) and the concatenation (using <a href=https://pytorch.org/docs/stable/generated/torch.cat.html#torch.cat>torch.cat</a>).
 # </p>
 # </div>
 
@@ -316,12 +314,10 @@ class CropAndConcat(torch.nn.Module):
         return x[slices]
 
     def forward(self, encoder_output, upsample_output):
-        encoder_cropped = self.crop(encoder_output, upsample_output)  # leave this out
-
-        return torch.cat([encoder_cropped, upsample_output], dim=1)  # leave this out
+        # Task 4: Implement the forward function
 
 
-# %% tags=[]
+# %% tags=["solution"]
 class CropAndConcat(torch.nn.Module):
     def crop(self, x, y):
         """Center-crop x to match spatial dimensions given by y."""
@@ -335,9 +331,9 @@ class CropAndConcat(torch.nn.Module):
         return x[slices]
 
     def forward(self, encoder_output, upsample_output):
-        encoder_cropped = self.crop(encoder_output, upsample_output)  # leave this out
+        encoder_cropped = self.crop(encoder_output, upsample_output)
 
-        return torch.cat([encoder_cropped, upsample_output], dim=1)  # leave this out
+        return torch.cat([encoder_cropped, upsample_output], dim=1)
 
 
 # %%
