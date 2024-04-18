@@ -83,7 +83,7 @@ sample_1d_input = torch.tensor([[[1,2,3,4]]], dtype=torch.float64)
 sample_2d_input = torch.tensor([[[[1,2,],[3,4]]]], dtype=torch.float64)
 sample_2d_input
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
 #     <b>Task 1:</b> Try out different upsampling techniques
 #     <p>For our U-net, we will use the built-in PyTorch Upsample Module. Here we will practice declaring and calling an Upsample module with different parameters.</p>
@@ -295,14 +295,33 @@ unet_tests.TestConvBlock(ConvBlock).run()
 # TODO: Add test
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
 #     <b>Task 4:</b> Implement a CropAndConcat module
 #     <p>Below, you must implement the forward algorithm, including the cropping (using the provided helper function <code>self.crop</code>) and the concatenation (using <a href=https://pytorch.org/docs/stable/generated/torch.cat.html#torch.cat>torch.cat</a>).
 # </p>
 # </div>
 
-# %%
+# %% tags=[]
+class CropAndConcat(torch.nn.Module):
+    def crop(self, x, y):
+        """Center-crop x to match spatial dimensions given by y."""
+
+        x_target_size = x.size()[:-2] + y.size()[-2:]
+
+        offset = tuple((a - b) // 2 for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(slice(o, o + s) for o, s in zip(offset, x_target_size))
+
+        return x[slices]
+
+    def forward(self, encoder_output, upsample_output):
+        encoder_cropped = self.crop(encoder_output, upsample_output)  # leave this out
+
+        return torch.cat([encoder_cropped, upsample_output], dim=1)  # leave this out
+
+
+# %% tags=[]
 class CropAndConcat(torch.nn.Module):
     def crop(self, x, y):
         """Center-crop x to match spatial dimensions given by y."""
@@ -331,31 +350,68 @@ unet_tests.TestCropAndConcat(CropAndConcat).run()
 # The final block we need to write for our U-Net is the output convolution block. The exact format of output you want depends on your task, so our U-Net must be flexible enough to handle different numbers of out channels and different final activation functions.
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
 #     <b>Task 5:</b> Implement an OutputConv Module
 #     <ol>
-#         <li>Define the convolution and final activation module in the <code>__init__</code> function. You can use a convolution with kernel size 1 to get the appropriate number of output channels.</li>
+#         <li>Define the convolution module in the <code>__init__</code> function. You can use a convolution with kernel size 1 to get the appropriate number of output channels. The activation submodule is provided for you.</li>
 #         <li>Call the final convolution and activation modules in the <code>forward</code> function</li>
 #     </ol>
 # </div>
 
-# %%
+# %% tags=[]
 class OutputConv(torch.nn.Module):
     def __init__(
         self,
         in_channels: int,
         out_channels: int,
-        activation: Optional[
-            str
-        ] = None,  # Accepts the name of any torch activation function (e.g., ``ReLU`` for ``torch.nn.ReLU``).
+        activation: str | None = None,  
     ):
         """
-        Use a convolution with kernel size 1 to obtain the appropriate number of output channels. 
-        Then apply final activation.
+        A module that uses a convolution with kernel size 1 to get the appropriate 
+        number of output channels, and then optionally applies a final activation.
+        
+        Args:
+            in_channels (int): The number of feature maps that will be input to the
+                OutputConv block.
+            out_channels (int): The number of channels that you want in the output
+            activation (str | None, optional): Accepts the name of any torch activation
+                function  (e.g., ``ReLU`` for ``torch.nn.ReLU``) or None for no final 
+                activation. Defaults to None.
         """
         super().__init__()
-        self.final_conv = torch.nn.Conv2d(in_channels, out_channels, 1, padding=0) # leave this out
+        # Task 5.1: Define the convolution submodule
+        if activation is None:
+            self.activation = None
+        else:
+            self.activation = getattr(torch.nn, activation)()
+    
+    def forward(self, x):
+        # Task 5.2: Implement the forward function
+
+
+# %% tags=["solution"]
+class OutputConv(torch.nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        activation: str | None = None, 
+    ):
+        """
+        A module that uses a convolution with kernel size 1 to get the appropriate 
+        number of output channels, and then optionally applies a final activation.
+        
+        Args:
+            in_channels (int): The number of feature maps that will be input to the
+                OutputConv block.
+            out_channels (int): The number of channels that you want in the output
+            activation (str | None, optional): Accepts the name of any torch activation
+                function  (e.g., ``ReLU`` for ``torch.nn.ReLU``) or None for no final 
+                activation. Defaults to None.
+        """
+        super().__init__()
+        self.final_conv = torch.nn.Conv2d(in_channels, out_channels, 1, padding=0)
         if activation is None:
             self.activation = None
         else:
@@ -368,14 +424,14 @@ class OutputConv(torch.nn.Module):
         return x
 
 
-# %%
+# %% tags=[]
 out_conv = OutputConv(in_channels=1, out_channels=1, activation="ReLU")
 apply_and_show_random_image(out_conv)
 
 # %%
 unet_tests.TestOutputConv(OutputConv).run()
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 1</h2>
 #
@@ -392,14 +448,14 @@ unet_tests.TestOutputConv(OutputConv).run()
 #
 # <hr style="height:2px;">
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ## Putting the U-Net together
 #
 # Now we will make a U-Net class that combines all of these components as shown in the image. This image shows a U-Net of depth 5 with specific input channels, feature maps, upsampling, and final activation. Ours will be configurable with regards to depth and other features.
 # ![image](static/UNet_figure.png)
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
 #     <b>Task 6:</b> U-Net Implementation
 #     <p>Now we will implement our U-Net! We have written some of it for you - follow the steps below to fill in the missing parts.</p>
@@ -411,7 +467,128 @@ unet_tests.TestOutputConv(OutputConv).run()
 #         </ol>
 # </div>
 
-# %%
+# %% tags=[]
+class UNet(torch.nn.Module):
+    def __init__(
+        self,
+        depth: int,
+        in_channels: int,
+        out_channels: int = 1, 
+        final_activation: str | None = None,
+        num_fmaps: int = 64,
+        fmap_inc_factor: int = 2,
+        downsample_factor: int = 2,
+        kernel_size: int = 3,
+        padding: str = "same",
+        upsample_mode: str = "nearest",
+    ):
+        """A U-Net for 2D input that expects tensors shaped like::
+            ``(batch, channels, height, width)``.
+        Args:
+            depth:
+                The number of levels in the U-Net. 2 is the smallest that really
+                makes sense for the U-Net architecture, as a one layer U-Net is
+                basically just 2 conv blocks.
+            in_channels:
+                The number of input channels in your dataset.
+            out_channels (optional):
+                How many output channels you want. Depends on your task. Defaults to 1.
+            final_activation (optional):
+                What activation to use in your final output block. Depends on your task.
+                Defaults to None.
+            num_fmaps (optional):
+                The number of feature maps in the first layer. Defaults to 64.
+            fmap_inc_factor (optional):
+                By how much to multiply the number of feature maps between
+                layers. Encoder layer ``l`` will have ``num_fmaps*fmap_inc_factor**l`` 
+                output feature maps. Defaults to 2.
+            downsample_factor (optional):
+                Factor to use for down- and up-sampling the feature maps between layers.
+                Defaults to 2.
+            kernel_size (optional):
+                Kernel size to use in convolutions on both sides of the UNet.
+                Defaults to 3.
+            padding (optional):
+                How to pad convolutions. Either 'same' or 'valid'. Defaults to "same."
+            upsample_mode (optional):
+                The upsampling mode to pass to torch.nn.Upsample. Usually "nearest" 
+                or "bilinear." Defaults to "nearest."
+        """
+
+        super().__init__()
+
+        self.depth = depth
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.final_activation = final_activation
+        self.num_fmaps = num_fmaps
+        self.fmap_inc_factor = fmap_inc_factor
+        self.downsample_factor = downsample_factor
+        self.kernel_size = kernel_size
+        self.padding = padding
+        self.upsample_mode = upsample_mode
+
+        # left convolutional passes
+        self.left_convs = torch.nn.ModuleList()
+        # Task 6.2: Initialize list here
+
+        # right convolutional passes
+        self.right_convs = torch.nn.ModuleList()
+        # Task 6.2: Initialize list here
+        
+        # Task 6.3: Initialize other modules here
+
+    def compute_fmaps_encoder(self, level: int) -> tuple[int, int]:
+        """Compute the number of input and output feature maps for 
+        a conv block at a given level of the UNet encoder (left side). 
+
+        Args:
+            level (int): The level of the U-Net which we are computing
+            the feature maps for. Level 0 is the input level, level 1 is
+            the first downsampled layer, and level=depth - 1 is the bottom layer.
+
+        Output (tuple[int, int]): The number of input and output feature maps
+            of the encoder convolutional pass in the given level.
+        """
+        # Task 6.1: Implement this function
+        pass
+
+    def compute_fmaps_decoder(self, level: int) -> tuple[int, int]:
+        """Compute the number of input and output feature maps for a conv block
+        at a given level of the UNet decoder (right side). Note:
+        The bottom layer (depth - 1) is considered an "encoder" conv pass, 
+        so this function is only valid up to depth - 2.
+        
+        Args:
+            level (int): The level of the U-Net which we are computing
+            the feature maps for. Level 0 is the input level, level 1 is
+            the first downsampled layer, and level=depth - 1 is the bottom layer.
+
+        Output (tuple[int, int]): The number of input and output feature maps
+            of the encoder convolutional pass in the given level.
+        """
+        # Task 6.1: Implement this function
+        pass
+
+    def forward(self, x):
+        # left side
+        # Hint - you will need the outputs of each encoder layer later
+        convolution_outputs = []  
+        layer_input = x
+        for i in range(self.depth - 1):
+            # Task 6.4: Implement encoder here
+
+        # bottom
+        # Task 6.4: Implement bottom of U-Net here
+
+        # right
+        for i in range(0, self.depth-1)[::-1]:
+            # Task 6.4: Implement decoder here
+
+        return # Task 6.4: Return the final output
+
+
+# %% tags=["solution"]
 class UNet(torch.nn.Module):
     def __init__(
         self,
@@ -586,7 +763,7 @@ simple_net = UNet(depth=2, in_channels=1)
 # %%
 apply_and_show_random_image(simple_net)
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ### Receptive Field
 #
 # The receptive field of a U-Net is the set of input pixels that contribute to a specific output pixel.
@@ -597,7 +774,13 @@ apply_and_show_random_image(simple_net)
 #
 # The `plot_receptive_field` function visualizes the receptive field of a given U-Net - the square shows how many input pixels contribute to the output at the center pixel. Try it out with different U-Nets to get a sense of how varying the depth, kernel size, and downsample factor affect the receptive field of a U-Net.
 
-# %%
+# %% tags=[]
+from local import plot_receptive_field
+
+new_net = ... # TODO: declare your U-Net here
+plot_receptive_field(new_net)
+
+# %% tags=["solution"]
 from local import plot_receptive_field
 
 new_net = UNet(
@@ -607,7 +790,7 @@ new_net = UNet(
         kernel_size=3,)
 plot_receptive_field(new_net)
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 2</h2>
 #
@@ -629,7 +812,7 @@ plot_receptive_field(new_net)
 #
 # We will use Tensorboard to log our training runs, so there is code in the train loop to log aspects of the training to Tensorboard.
 
-# %%
+# %% tags=[]
 train_dataset = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_dataset)
 
@@ -736,11 +919,11 @@ def train(
 # %% [markdown]
 # Now we start our Tensorboard server and show it inside the notebook.
 
-# %%
+# %% tags=[]
 # start a tensorboard writer
-# %tensorboard --logdir runs
+# %tensorboard --logdir unet_runs
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
 #     <b>Task 7:</b> Declare and train a U-Net
 #     <ol>
@@ -749,18 +932,22 @@ def train(
 #         </ol>
 # </div>
 
-# %%
+# %% tags=[]
+model = ... # Task 7.1: Declare your U-Net here and name it below
+model_name = "my_fav_unet"  # This name will be used in the tensorboard logs
+logger = SummaryWriter(f"unet_runs/{model_name}")
+
+# %% tags=["solution"]
 model = UNet(depth=4, in_channels=1)
 model_name = "my_fav_unet"  # This name will be used in the tensorboard logs
-logger = SummaryWriter(f"runs/{model_name}")
+logger = SummaryWriter(f"unet_runs/{model_name}")
 
-# %%
+# %% tags=[]
 # use adam optimizer
 optimizer = torch.optim.Adam(model.parameters())
 
 # train for $5$ epochs
-# during the training you can inspect the
-# predictions in the tensorboard
+# Task 7.2: Run this cell and examine outputs in Tensorboard above!
 n_epochs = 5
 for epoch in range(n_epochs):
     # train
@@ -774,17 +961,17 @@ for epoch in range(n_epochs):
     )
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
-#     <b>Task 7:</b> Train more U-Nets!
+#     <b>Task 8:</b> Train more U-Nets!
 #     <ol>
-#         <li>Declare a new U-Net with different parameters.</li>
+#         <li>Declare a new U-Net with different parameters. If you use a different name in the Tensorboard logger, you will be able to know which logs are from which run.</li>
 #         <li>Train your new U-Net - does it perform better or worse? How can you tell?</li>
 #         <li>Keep tinkering with different architectures until the end of the exercise!</li>
 #         </ol>
 # </div>
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 3</h2>
 #
