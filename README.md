@@ -1,4 +1,4 @@
-# Exercises 1-3: U-Net, Instance Segmentation, and Semantic Segmentation
+# Exercises 1-3: U-Net, Semantic Segmentation, and Instance Segmentation
 
 ## Setup
 
