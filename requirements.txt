@@ -5,6 +5,7 @@ torchvision
 jupyter 
 imageio
 scipy
+scikit-image
 tensorboard
 matplotlib
 # pytorch-cuda=12.1
