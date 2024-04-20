@@ -37,9 +37,9 @@ from skimage.filters import threshold_otsu
 
 
 # %%
-device = "mps"  # 'cuda', 'cpu', 'mps'
+device = "cuda"  # 'cuda', 'cpu', 'mps'
 # make sure gpu is available. Please call a TA if this cell fails
-# assert torch.cuda.is_available()
+assert torch.cuda.is_available()
 
 # %%
 # Download a custom label color map
@@ -270,8 +270,7 @@ class SDTDataset(Dataset):
 # %%
 train_data = SDTDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
-val_data = SDTDataset("nuclei_val_data", transforms.RandomCrop(256))
-val_loader = DataLoader(val_data, batch_size=5, shuffle=False)
+
 show_random_dataset_image(train_data)
 
 # %% [markdown]
@@ -340,6 +339,8 @@ for epoch in range(10):
 # Next, let's run the inference using our trained model and visualize some random samples.
 
 # %%
+val_data = SDTDataset("nuclei_val_data")
+
 unet.eval()
 idx = np.random.randint(len(val_data))  # take a random sample
 image, mask = val_data[idx]  # get the image and the nuclei masks
@@ -407,7 +408,7 @@ def find_local_maxima(distance_transform, min_seed_distance):
 
 
 # %% tags=["solution"]
-
+from scipy.ndimage import label, maximum_filter
 
 def find_local_maxima(distance_transform, min_seed_distance):
     # Use `maximum_filter` to perform a maximum filter convolution on the distance_transform
