@@ -10,6 +10,16 @@ source setup.sh
 
 When you are ready to start the exercise, make sure you are in your base environment and then run jupyter lab.
 ```bash
-mamba activate base
+mamba activate segmentations
 jupyter lab
 ```
+
+## Outline
+
+### Exercise 1: 1-unet_exercise.ipynb
+
+
+### Exercise 2: 2-semantic_exercise.ipynb
+
+
+### Exercise 3: 3-instance_exercise.ipynb

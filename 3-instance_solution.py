@@ -410,6 +410,7 @@ def find_local_maxima(distance_transform, min_seed_distance):
 # %% tags=["solution"]
 from scipy.ndimage import label, maximum_filter
 
+
 def find_local_maxima(distance_transform, min_seed_distance):
     # Use `maximum_filter` to perform a maximum filter convolution on the distance_transform
     max_filtered = maximum_filter(distance_transform, min_seed_distance)
