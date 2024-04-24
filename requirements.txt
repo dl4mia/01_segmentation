@@ -8,6 +8,6 @@ scipy
 scikit-image
 tensorboard
 matplotlib
-# pytorch-cuda=12.1
+pytorch-cuda==11.8s
 ipykernel
 jupytext
