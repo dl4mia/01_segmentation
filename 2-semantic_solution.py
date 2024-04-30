@@ -182,7 +182,7 @@ class DiceCoefficient(nn.Module):
         intersection = (prediction * target).sum()
         union = (prediction * prediction).sum() + (target * target).sum()
         return 2 * intersection / union.clamp(min=self.eps)
-    
+
 
 # %% [markdown]
 # <div class="alert alert-block alert-warning">
@@ -243,6 +243,7 @@ assert dice(wrong_prediction, target) == 0.0, dice(wrong_prediction, target)
 # </div>
 #
 # <hr style="height:2px;">
+
 
 # %%
 # run validation after training epoch
@@ -417,8 +418,8 @@ validate(
 # %% [markdown]
 # PS: PyTorch already has quite a few possible data transforms, so if you need one, check
 # [here](https://pytorch.org/vision/stable/transforms.html#transforms-on-pil-image-and-torch-tensor).
-# The biggest problem with them is that they are clearly separated into transforms applied to PIL 
-# images (remember, we initially load the images as PIL.Image?) and torch.tensors (remember, we 
+# The biggest problem with them is that they are clearly separated into transforms applied to PIL
+# images (remember, we initially load the images as PIL.Image?) and torch.tensors (remember, we
 # converted the images into tensors by calling transforms.ToTensor()?). This can be incredibly
 # annoying if for some reason you might need to transorm your images to tensors before applying any
 # other transforms or you don't want to use PIL library at all.
@@ -432,7 +433,9 @@ train_data = NucleiDataset("nuclei_train_data", transforms_v2.RandomCrop(256))
 augmented_data = NucleiDataset(
     "nuclei_train_data",
     transforms_v2.RandomCrop(256),
-    img_transform=transforms_v2.Compose([transforms_v2.GaussianBlur(5, sigma=10.0), transforms_v2.RandomRotation(45)]),
+    img_transform=transforms_v2.Compose(
+        [transforms_v2.GaussianBlur(5, sigma=10.0), transforms_v2.RandomRotation(45)]
+    ),
 )
 
 # %%
@@ -524,7 +527,9 @@ logger = SummaryWriter("runs/Unet")
 
 # %%
 # Use the unet you expect to work the best!
-model = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2, final_activation="Sigmoid")
+model = UNet(
+    depth=4, in_channels=1, out_channels=1, num_fmaps=2, final_activation="Sigmoid"
+)
 
 # use adam optimizer
 optimizer = torch.optim.Adam(model.parameters())
