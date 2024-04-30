@@ -6,13 +6,19 @@
 #
 # For isolated objects, this is trivial, all connected foreground pixels form one instance, yet often instances are very close together or even overlapping. Thus we need to think a bit more how to formulate the targets / loss of our network.
 #
-# Furthermore, in instance segmentation the specific value of each label is arbitrary. Here, `Mask 1` and `Mask 2` below would be equivalent even though the values of pixels on individual cells is different.
+# Furthermore, in instance segmentation the specific value of each label is arbitrary. Here, `Mask 1` and `Mask 2` are equivalently good segmentations even though the values of pixels on individual cells are different.
 #
 # | Image | Mask 1| Mask 2|
 # | :-: | :-: | :-: |
 # | ![image](static/01_instance_img.png) | ![mask1](static/02_instance_teaser.png) | ![mask2](static/03_instance_teaser.png) |
 #
-# Therefore, we must devise an auxilliary task to train the model on, which we then can post process into our final instance segmentation.
+# Once again: THE SPECIFIC VALUES OF THE LABELS ARE ARBITRARY
+#
+# This means that the model will not be able to learn, if tasked to predict the labels directly.
+#
+# Therefore we split the task of instance segmentation in two and introduce an intermediate which must be:
+#   1) learnable
+#   2) post-processable into an instance segmentation
 
 # %% [markdown]
 # ## Import Packages
@@ -37,7 +43,7 @@ from skimage.filters import threshold_otsu
 
 
 # %%
-device = "cuda"  # 'cuda', 'cpu', 'mps'
+device = "cpu"  # 'cuda', 'cpu', 'mps'
 # make sure gpu is available. Please call a TA if this cell fails
 assert torch.cuda.is_available()
 
@@ -51,7 +57,15 @@ label_cmap = ListedColormap(np.load("cmap_60.npy"))
 
 # %% [markdown]
 # ## Section 1: Signed Distance Transform (SDT)
-# <i>What is the signed distance transform?</i> <br> Signed Distance Transform indicates the distance to the boundary of objects. <br> It should be positive for pixels inside objects and negative for pixels outside objects (i.e. in the background).<br> As an example, here, you see the SDT (right) of the target mask (middle), below.
+#
+# First we will use the signed distance transform as an intermediate learning objective
+#
+# <i>What is the signed distance transform?</i>
+# <br>  - Signed Distance Transform indicates the distance to the boundary of objects.
+# <br>  - It is positive for pixels inside objects and negative for pixels outside objects (i.e. in the background).
+# <br>  - Remember that deep learning models work best with normalized values, therefore it is important the scale the distance
+#            transform. For simplicity things are often scaled between -1 and 1.
+# <br>  - As an example, here, you see the SDT (right) of the target mask (middle), below.
 
 # %% [markdown]
 # ![image](static/04_instance_sdt.png)
@@ -105,22 +119,14 @@ def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
 # Below is a small function to visualize the signed distance transform (SDT). <br> Use it to validate your function.
 # %%
 # Visualize the signed distance transform using the function you wrote above.
+from local import plot_img_and_inter
 train_data = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
 idx = np.random.randint(len(train_data))  # take a random sample
 img, mask = train_data[idx]  # get the image and the nuclei masks
 
-fig = plt.figure(constrained_layout=False, figsize=(10, 3))
-spec = gridspec.GridSpec(ncols=2, nrows=1, figure=fig)
-ax1 = fig.add_subplot(spec[0, 0])
-ax1.set_xlabel("Image", fontsize=20)
-plt.imshow(img[0], cmap="magma")
-ax2 = fig.add_subplot(spec[0, 1])
-ax2.set_xlabel("SDT", fontsize=20)
-plt.imshow(compute_sdt(mask[0]), cmap="magma")
-_ = [ax.set_xticks([]) for ax in [ax1, ax2]]
-_ = [ax.set_yticks([]) for ax in [ax1, ax2]]
-plt.tight_layout()
-plt.show()
+sdt = compute_sdt(mask[0])
+plot_img_and_inter(img, sdt, label='SDT')
+
 
 
 # %% tags [markdown]
@@ -324,7 +330,7 @@ learning_rate = 1e-4
 optimizer = torch.optim.Adam(unet.parameters(), lr=learning_rate)
 
 
-for epoch in range(10):
+for epoch in range(1):
     train(
         unet,
         train_loader,
@@ -339,37 +345,20 @@ for epoch in range(10):
 # Next, let's run the inference using our trained model and visualize some random samples.
 
 # %%
+from local import plot_three
 val_data = SDTDataset("nuclei_val_data")
 
 unet.eval()
 idx = np.random.randint(len(val_data))  # take a random sample
-image, mask = val_data[idx]  # get the image and the nuclei masks
+image, sdt = val_data[idx]  # get the image and the nuclei masks
 image = image.to(device)
 pred = unet(torch.unsqueeze(image, dim=0))
 image = np.squeeze(image.cpu())
-mask = np.squeeze(mask.cpu().numpy())
+sdt = np.squeeze(sdt.cpu().numpy())
 pred = np.squeeze(pred.cpu().detach().numpy())
 
+plot_three(img[0], sdt, pred)
 
-fig = plt.figure(constrained_layout=False, figsize=(10, 3))
-spec = gridspec.GridSpec(ncols=3, nrows=1, figure=fig)
-ax1 = fig.add_subplot(spec[0, 0])
-ax1.set_xlabel("Image", fontsize=20)
-plt.imshow(image, cmap="magma")
-ax2 = fig.add_subplot(spec[0, 1])
-ax2.set_xlabel("SDT", fontsize=20)
-plt.imshow(mask, cmap="magma")
-ax3 = fig.add_subplot(spec[0, 2])
-ax3.set_xlabel("PREDICTION", fontsize=20)
-t = plt.imshow(pred, cmap="magma")
-cbar = fig.colorbar(t, fraction=0.046, pad=0.04)
-tick_locator = ticker.MaxNLocator(nbins=3)
-cbar.locator = tick_locator
-cbar.update_ticks()
-_ = [ax.set_xticks([]) for ax in [ax1, ax2, ax3]]  # remove the xticks
-_ = [ax.set_yticks([]) for ax in [ax1, ax2, ax3]]  # remove the yticks
-plt.tight_layout()
-plt.show()
 
 # %% [markdown]
 # <div class="alert alert-block alert-success">
@@ -504,28 +493,9 @@ seg = watershed_from_boundary_distance(pred, inner_mask, min_seed_distance=20)
 
 # %% tags=["solution"]
 # Visualize the results
-fig = plt.figure(constrained_layout=False, figsize=(10, 3))
-spec = gridspec.GridSpec(ncols=4, nrows=1, figure=fig)
-ax1 = fig.add_subplot(spec[0, 0])
-ax1.imshow(image)  # show the image
-ax1.set_xlabel("Image", fontsize=20)
-ax2 = fig.add_subplot(spec[0, 1])
-ax2.imshow(mask)  # show the masks
-ax2.set_xlabel("SDT", fontsize=20)
-ax3 = fig.add_subplot(spec[0, 2])
-t = ax3.imshow(pred)
-ax3.set_xlabel("Pred.", fontsize=20)
-tick_locator = ticker.MaxNLocator(nbins=3)
-cbar = fig.colorbar(t, fraction=0.046, pad=0.04)
-cbar.locator = tick_locator
-cbar.update_ticks()
-ax4 = fig.add_subplot(spec[0, 3])
-ax4.imshow(seg, cmap=label_cmap, interpolation="none")
-ax4.set_xlabel("Seg.", fontsize=20)
-_ = [ax.set_xticks([]) for ax in [ax1, ax2, ax3, ax4]]  # remove the xticks
-_ = [ax.set_yticks([]) for ax in [ax1, ax2, ax3, ax4]]  # remove the yticks
-plt.tight_layout()
-plt.show()
+from local import plot_four
+
+plot_four(image, mask, pred, seg)
 
 # %% [markdown]
 # Questions:
@@ -739,26 +709,7 @@ image = np.squeeze(image.cpu())
 mask = np.squeeze(mask.cpu().numpy())
 pred = np.squeeze(pred.cpu().detach().numpy())
 
-
-fig = plt.figure(constrained_layout=False, figsize=(10, 3))
-spec = gridspec.GridSpec(ncols=3, nrows=1, figure=fig)
-ax1 = fig.add_subplot(spec[0, 0])
-ax1.set_xlabel("Image", fontsize=20)
-plt.imshow(image, cmap="magma")
-ax2 = fig.add_subplot(spec[0, 1])
-ax2.set_xlabel("AFFINITY", fontsize=20)
-plt.imshow(mask[0] + mask[1], cmap="magma")
-ax3 = fig.add_subplot(spec[0, 2])
-ax3.set_xlabel("PREDICTION", fontsize=20)
-t = plt.imshow(pred[0] + pred[1], cmap="magma")
-cbar = fig.colorbar(t, fraction=0.046, pad=0.04)
-tick_locator = ticker.MaxNLocator(nbins=3)
-cbar.locator = tick_locator
-cbar.update_ticks()
-_ = [ax.set_xticks([]) for ax in [ax1, ax2, ax3]]  # remove the xticks
-_ = [ax.set_yticks([]) for ax in [ax1, ax2, ax3]]  # remove the yticks
-plt.tight_layout()
-plt.show()
+plot_three(image, mask[0]+mask[1], pred[0]+pred[1], label='AFFINITY')
 
 # %% [markdown]
 # Let's also evaluate the model performance.
