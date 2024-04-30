@@ -1000,6 +1000,8 @@ def train(
         # if necessary, crop the masks to match the model output shape
         if prediction.shape != y.shape:
             y = crop(y, prediction)
+        if y.dtype != prediction.dtype:
+            y = y.type(prediction.dtype)
         loss = loss_function(prediction, y)
 
         # backpropagate the loss and adjust the parameters

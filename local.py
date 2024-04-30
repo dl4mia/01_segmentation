@@ -190,6 +190,8 @@ def train(
         prediction = model(x)
         if prediction.shape != y.shape:
             y = crop(y, prediction)
+        if y.dtype != prediction.dtype:
+            y = y.type(prediction.dtype)
         loss = loss_function(prediction, y)
 
         # backpropagate the loss and adjust the parameters
