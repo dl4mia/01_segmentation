@@ -1046,7 +1046,7 @@ def train(
 
 
 # %% [markdown] tags=[]
-# Now we start our Tensorboard server and show it inside the notebook. We haven't logged anything yet so you'll see "No dashboards are active for the current data set."
+# Now we start our Tensorboard server and show it inside the notebook. We haven't logged anything yet so you'll see "No dashboards are active for the current data set." After you start training, you may need to press the refresh button in the top right to see the logs. When looking at the loss, we recommend smoothing (slider in the settings toolbar) because the raw numbers are very noisy.
 
 # %% tags=[]
 # start a tensorboard writer
