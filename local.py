@@ -2,6 +2,7 @@
 import os
 import imageio
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
 import numpy as np
 from PIL import Image
 import torch
@@ -363,3 +364,38 @@ def evaluate(gt_labels: np.ndarray, pred_labels: np.ndarray, th: float = 0.5):
     recall = tp / max(1, tp + fn)
 
     return ap, precision, recall, tp, fp, fn
+
+def plot_img_and_inter(img, sdt, label):
+    fig = plt.figure(constrained_layout=False, figsize=(10, 3))
+    spec = gridspec.GridSpec(ncols=2, nrows=1, figure=fig)
+    ax1 = fig.add_subplot(spec[0, 0])
+    ax1.set_xlabel("Image", fontsize=20)
+    plt.imshow(img[0], cmap="magma")
+    ax2 = fig.add_subplot(spec[0, 1])
+    ax2.set_xlabel(label, fontsize=20)
+    plt.imshow(sdt, cmap="magma")
+    _ = [ax.set_xticks([]) for ax in [ax1, ax2]]
+    _ = [ax.set_yticks([]) for ax in [ax1, ax2]]
+    plt.tight_layout()
+    plt.show()
+
+def plot_img_inter_and_pred(image, intermediate, pred):
+    fig = plt.figure(constrained_layout=False, figsize=(10, 3))
+    spec = gridspec.GridSpec(ncols=3, nrows=1, figure=fig)
+    ax1 = fig.add_subplot(spec[0, 0])
+    ax1.set_xlabel("Image", fontsize=20)
+    plt.imshow(image, cmap="magma")
+    ax2 = fig.add_subplot(spec[0, 1])
+    ax2.set_xlabel("SDT", fontsize=20)
+    plt.imshow(intermediate, cmap="magma")
+    ax3 = fig.add_subplot(spec[0, 2])
+    ax3.set_xlabel("PREDICTION", fontsize=20)
+    t = plt.imshow(pred, cmap="magma")
+    cbar = fig.colorbar(t, fraction=0.046, pad=0.04)
+    tick_locator = ticker.MaxNLocator(nbins=3)
+    cbar.locator = tick_locator
+    cbar.update_ticks()
+    _ = [ax.set_xticks([]) for ax in [ax1, ax2, ax3]]  # remove the xticks
+    _ = [ax.set_yticks([]) for ax in [ax1, ax2, ax3]]  # remove the yticks
+    plt.tight_layout()
+    plt.show()
