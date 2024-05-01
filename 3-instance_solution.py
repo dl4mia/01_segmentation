@@ -120,13 +120,13 @@ def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
 # %%
 # Visualize the signed distance transform using the function you wrote above.
 from local import plot_img_and_inter
+
 train_data = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
 idx = np.random.randint(len(train_data))  # take a random sample
 img, mask = train_data[idx]  # get the image and the nuclei masks
 
 sdt = compute_sdt(mask[0])
-plot_img_and_inter(img, sdt, label='SDT')
-
+plot_img_and_inter(img, sdt, label="SDT")
 
 
 # %% tags [markdown]
@@ -346,6 +346,7 @@ for epoch in range(1):
 
 # %%
 from local import plot_three
+
 val_data = SDTDataset("nuclei_val_data")
 
 unet.eval()
@@ -453,6 +454,7 @@ def get_inner_mask(pred, threshold):
 idx = np.random.randint(len(val_data))  # take a random sample
 image, mask = val_data[idx]  # get the image and the nuclei masks
 
+# get the model prediction
 # Hint: make sure set the model to evaluation
 
 # Choose a threshold value to use to get the boundary mask
@@ -479,7 +481,6 @@ image = np.squeeze(image.cpu())
 mask = np.squeeze(mask.cpu().numpy())
 pred = np.squeeze(pred.cpu().detach().numpy())
 
-# %% tags=["solution"]
 # Choose a threshold value to use to get the boundary mask.
 # Feel free to play around with the threshold.
 threshold = threshold_otsu(pred)
@@ -491,7 +492,7 @@ inner_mask = get_inner_mask(pred, threshold=threshold)
 # Get the segmentation
 seg = watershed_from_boundary_distance(pred, inner_mask, min_seed_distance=20)
 
-# %% tags=["solution"]
+# %% 
 # Visualize the results
 from local import plot_four
 
@@ -559,23 +560,20 @@ for idx, (image, mask, sdt) in enumerate(tqdm(val_dataloader)):
     ap_list.append(ap)
     precision_list.append(precision)
     recall_list.append(recall)
-    tp_list.append(tp)
-    fp_list.append(fp)
-    fn_list.append(fn)
+
 print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
-print(f"Mean True Positives is {np.mean(tp_list):.3f}")
-print(f"Mean False Positive is {np.mean(fp_list):.3f}")
-print(f"Mean False Negatives is {np.mean(fn_list):.3f}")
 # %% [markdown]
 # <hr style="height:2px;">
 #
 # ## Section 4: Affinities
 # %% [markdown]
 # <i>What are affinities? </i><br>
-# Here we consider not just the pixel but also its direct neighbors. <br> Imagine there is an edge between two pixels if they
-# are in the same class and no edge if not. If we then take all pixels that are directly and indirectly connected by edges, we get an instance. Essentially, we label edges between neighboring pixels as “connected” or “cut”, rather than labeling the pixels themselves. <br>
+# Here we consider not just the pixel but also its direct neighbors. 
+# <br> Imagine there is an edge between two pixels if they are in the same class and no edge if not.
+# <br> If we then take all pixels that are directly and indirectly connected by edges, we get an instance. 
+# <br> Essentially, we label edges between neighboring pixels as “connected” or “cut”, rather than labeling the pixels themselves. <br>
 # Here, below we show the affinity in x + affinity in y.
 
 # %% [markdown]
@@ -659,8 +657,15 @@ show_random_dataset_image(train_data)
 # </div>
 # %% [markdown]
 # Repurpose the training loop which you used for the SDTs. <br>
-# Think carefully about your loss and final activation. <br>
+# Think carefully about your final activation and number of out channels. <br>
 # (The best for SDT is not necessarily the best for affinities.)
+
+# %%
+# define the model
+
+# specify loss / optimizer
+
+# training loop
 
 
 # %% tags=["solutions"]
@@ -709,7 +714,7 @@ image = np.squeeze(image.cpu())
 mask = np.squeeze(mask.cpu().numpy())
 pred = np.squeeze(pred.cpu().detach().numpy())
 
-plot_three(image, mask[0]+mask[1], pred[0]+pred[1], label='AFFINITY')
+plot_three(image, mask[0] + mask[1], pred[0] + pred[1], label="AFFINITY")
 
 # %% [markdown]
 # Let's also evaluate the model performance.
@@ -740,27 +745,51 @@ for idx, (image, mask, sdt) in enumerate(tqdm(val_loader)):
     ap_list.append(ap)
     precision_list.append(precision)
     recall_list.append(recall)
-    tp_list.append(tp)
-    fp_list.append(fp)
-    fn_list.append(fn)
+
 print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
-print(f"Mean True Positives is {np.mean(tp_list):.3f}")
-print(f"Mean False Positive is {np.mean(fp_list):.3f}")
-print(f"Mean False Negatives is {np.mean(fn_list):.3f}")
 
 # %% [markdown]
 # <hr style="height:2px;">
 #
 # ## Bonus: Pre-Trained Models
-# Try running a pretrained `cellpose` model using the script below.
+# Cellpose has an excellent pre-trained model for instance segmentation of cells and nuclei.
+# <br> take a look at the full built-in models and try to apply one to the dataset used in this exercise.
+# <br> -[cellpose github](https://github.com/MouseLand/cellpose)
+# <br> -[cellpose documentation](https://cellpose.readthedocs.io/en/latest/)
 
-# %%
-# !pip install cellpose
+
+
+# %% tags=['solution']
+# pip install cellpose
 from cellpose import models
 
-model = models.Cellpose(model_type="nuclei")
+# implement a cellpose pretrained model
+
+
+# evaluation
+ap_list, precision_list, recall_list, tp_list, fp_list, fn_list = [], [], [], [], [], []
+for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
+    gt_labels = np.squeeze(mask.cpu().numpy())
+    image = np.squeeze(image.cpu().numpy())
+
+    # evaluate the model to get predictions
+    pred_labels ... = ...
+
+    ap, precision, recall, tp, fp, fn = evaluate(gt_labels, pred_labels[0])
+    ap_list.append(ap)
+    precision_list.append(precision)
+    recall_list.append(recall)
+
+print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
+print(f"Mean Precision is {np.mean(precision_list):.3f}")
+print(f"Mean Recall is {np.mean(recall_list):.3f}")
+# %% tags=['solution']
+# pip install cellpose
+from cellpose import models
+
+model = models.Cellpose(model_type="nuclei") # remove this line
 channels = [[0, 0]]
 
 ap_list, precision_list, recall_list, tp_list, fp_list, fn_list = [], [], [], [], [], []
@@ -773,14 +802,7 @@ for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
     ap_list.append(ap)
     precision_list.append(precision)
     recall_list.append(recall)
-    tp_list.append(tp)
-    fp_list.append(fp)
-    fn_list.append(fn)
+
 print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
-print(f"Mean True Positives is {np.mean(tp_list):.3f}")
-print(f"Mean False Positive is {np.mean(fp_list):.3f}")
-print(f"Mean False Negatives is {np.mean(fn_list):.3f}")
-
-# %%
