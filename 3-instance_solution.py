@@ -172,7 +172,6 @@ class SDTDataset(Dataset):
         #  transformations to apply just to inputs
         self.inp_transforms = transforms.Compose(
             [
-                transforms.Grayscale(),  # some of the images are RGB
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),  # 0.5 = mean and 0.5 = variance
             ]
@@ -230,7 +229,6 @@ class SDTDataset(Dataset):
         #  transformations to apply just to inputs
         self.inp_transforms = transforms.Compose(
             [
-                transforms.Grayscale(),  # some of the images are RGB
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),  # 0.5 = mean and 0.5 = variance
             ]
