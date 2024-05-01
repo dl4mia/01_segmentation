@@ -78,7 +78,7 @@ label_cmap = ListedColormap(np.load("cmap_60.npy"))
 # (Hint: Use `distance_transform_edt` and `binary_erosion` which are imported in the first cell.)
 
 
-def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
+def compute_sdt(labels: np.ndarray, scale: int = 5):
     """Function to compute a signed distance transform."""
 
     # compute the distance transform inside and outside of the objects
@@ -96,15 +96,23 @@ def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
 # (Hint: Use `distance_transform_edt` and `binary_erosion` which are imported in the first cell.)
 
 
-def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
+def compute_sdt(labels: np.ndarray, scale: int = 5):
     """Function to compute a signed distance transform."""
 
     # compute the distance transform inside and outside of the objects
+    ids = np.unique(labels)
+    ids = ids[ids != 0]
+
+    for id_ in ids:
+        if "inner" not in locals():
+            inner = distance_transform_edt(labels == id_)
+        else:
+            inner += distance_transform_edt(labels == id_)
     inner = distance_transform_edt(binary_erosion(labels))
-    outer = distance_transform_edt(np.logical_not(labels))
+    outer = distance_transform_edt(labels == 0)
 
     # create the signed distance transform
-    distance = (inner - outer) + constant
+    distance = inner - outer
 
     # scale the distances so that they are between -1 and 1 (hint: np.tanh)
     distance = np.tanh(distance / scale)
@@ -260,7 +268,7 @@ class SDTDataset(Dataset):
             return image, sdt_mask
 
     def create_sdt_target(self, mask):
-        sdt_target_array = compute_sdt(mask, constant=0.5, scale=5)
+        sdt_target_array = compute_sdt(mask, scale=5)
         sdt_target = transforms.ToTensor()(sdt_target_array)
         return sdt_target.float()
 
