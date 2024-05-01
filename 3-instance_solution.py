@@ -31,7 +31,7 @@ from PIL import Image
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from torchvision import transforms
-from scipy.ndimage import distance_transform_edt, binary_erosion
+from scipy.ndimage import distance_transform_edt
 from local import train, NucleiDataset, plot_img_and_inter, plot_three, plot_four
 from unet import UNet
 from local import show_random_dataset_image
@@ -80,7 +80,7 @@ label_cmap = ListedColormap(np.load("cmap_60.npy"))
 
 def compute_sdt(labels: np.ndarray, scale: int = 5):
     """Function to compute a signed distance transform."""
-
+    labels = np.asarray(labels)
     # compute the distance transform inside and outside of the objects
 
     # create the signed distance transform
@@ -100,15 +100,13 @@ def compute_sdt(labels: np.ndarray, scale: int = 5):
     """Function to compute a signed distance transform."""
 
     # compute the distance transform inside and outside of the objects
+    labels = np.asarray(labels)
     ids = np.unique(labels)
     ids = ids[ids != 0]
+    inner = np.zeros(labels.shape, dtype=np.float32)
 
     for id_ in ids:
-        if "inner" not in locals():
-            inner = distance_transform_edt(labels == id_)
-        else:
-            inner += distance_transform_edt(labels == id_)
-    inner = distance_transform_edt(binary_erosion(labels))
+        inner += distance_transform_edt(labels == id_)
     outer = distance_transform_edt(labels == 0)
 
     # create the signed distance transform
@@ -268,7 +266,8 @@ class SDTDataset(Dataset):
             return image, sdt_mask
 
     def create_sdt_target(self, mask):
-        sdt_target_array = compute_sdt(mask, scale=5)
+
+        sdt_target_array = compute_sdt(mask, scale=2)
         sdt_target = transforms.ToTensor()(sdt_target_array)
         return sdt_target.float()
 
@@ -281,6 +280,7 @@ class SDTDataset(Dataset):
 # %%
 train_data = SDTDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
+
 
 show_random_dataset_image(train_data)
 
