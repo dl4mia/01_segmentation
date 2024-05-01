@@ -1,4 +1,3 @@
-
 import os
 import imageio
 import matplotlib.pyplot as plt
@@ -10,10 +9,8 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from scipy.ndimage import binary_erosion
 from skimage.segmentation import relabel_sequential
 from scipy.optimize import linear_sum_assignment
-
 
 
 def show_one_image(image_path):
@@ -36,7 +33,7 @@ class NucleiDataset(Dataset):
             [
                 transforms.Grayscale(),  # some of the images are RGB
                 transforms.ToTensor(),
-                transforms.Normalize([0.5], [0.5]), # 0.5 = mean and 0.5 = variance 
+                transforms.Normalize([0.5], [0.5]),  # 0.5 = mean and 0.5 = variance
             ]
         )
 
@@ -76,6 +73,7 @@ def show_random_dataset_image(dataset):
     print("Image size is %s" % {img[0].shape})
     plt.show()
 
+
 def show_random_dataset_image_with_prediction(dataset, model, device="cpu"):
     idx = np.random.randint(0, len(dataset))  # take a random sample
     img, mask = dataset[idx]  # get the image and the nuclei masks
@@ -89,16 +87,17 @@ def show_random_dataset_image_with_prediction(dataset, model, device="cpu"):
     print("Image size is %s" % {img[0].shape})
     plt.show()
 
+
 def show_random_augmentation_comparison(dataset_a, dataset_b):
     assert len(dataset_a) == len(dataset_b)
     idx = np.random.randint(0, len(dataset_a))  # take a random sample
     img_a, mask_a = dataset_a[idx]  # get the image and the nuclei masks
     img_b, mask_b = dataset_b[idx]  # get the image and the nuclei masks
     f, axarr = plt.subplots(2, 2)  # make two plots on one figure
-    axarr[0,0].imshow(img_a[0])  # show the image
-    axarr[0,1].imshow(mask_a[0], interpolation=None)  # show the masks
-    axarr[1,0].imshow(img_b[0])  # show the image
-    axarr[1,1].imshow(mask_b[0], interpolation=None)  # show the prediction
+    axarr[0, 0].imshow(img_a[0])  # show the image
+    axarr[0, 1].imshow(mask_a[0], interpolation=None)  # show the masks
+    axarr[1, 0].imshow(img_b[0])  # show the image
+    axarr[1, 1].imshow(mask_b[0], interpolation=None)  # show the prediction
     _ = [ax.axis("off") for ax in axarr.flatten()]  # remove the axes
     plt.show()
 
@@ -109,27 +108,31 @@ def apply_and_show_random_image(f, path="nuclei_train_data"):
     # pick random raw image from dataset
     img_tensor = ds[np.random.randint(len(ds))][0]
 
-    batch_tensor = torch.unsqueeze(img_tensor, 0) # add batch dimension that some torch modules expect
-    out_tensor = f(batch_tensor) # apply torch module
-    out_tensor = out_tensor.squeeze(0) # remove batch dimension
-    img_arr = img_tensor.numpy()[0] # turn into numpy array, look at first channel
-    out_arr = out_tensor.detach().numpy()[0] # turn into numpy array, look at first channel
-    
+    batch_tensor = torch.unsqueeze(
+        img_tensor, 0
+    )  # add batch dimension that some torch modules expect
+    out_tensor = f(batch_tensor)  # apply torch module
+    out_tensor = out_tensor.squeeze(0)  # remove batch dimension
+    img_arr = img_tensor.numpy()[0]  # turn into numpy array, look at first channel
+    out_arr = out_tensor.detach().numpy()[
+        0
+    ]  # turn into numpy array, look at first channel
+
     # intialilze figure
-    fig, axs = plt.subplots(1,2, figsize=(10,20))
-    
+    fig, axs = plt.subplots(1, 2, figsize=(10, 20))
+
     # Show input image, add info and colorbar
     img_min, img_max = (img_arr.min(), img_arr.max())  # get value range
-    inim = axs[0].imshow(img_arr, vmin = img_min, vmax = img_max)
+    inim = axs[0].imshow(img_arr, vmin=img_min, vmax=img_max)
     axs[0].set_title("Input Image")
     axs[0].set_xlabel(f"min: {img_min:.2f}, max: {img_max:.2f}, shape: {img_arr.shape}")
     div = make_axes_locatable(axs[0])
     cb = fig.colorbar(inim, cax=div.append_axes("right", size="5%", pad=0.05))
     cb.outline.set_visible(False)
-    
+
     # Show ouput image, add info and colorbar
-    out_min, out_max = (out_arr.min(), out_arr.max()) # get value range
-    outim = axs[1].imshow(out_arr, vmin=out_min,vmax=out_max)
+    out_min, out_max = (out_arr.min(), out_arr.max())  # get value range
+    outim = axs[1].imshow(out_arr, vmin=out_min, vmax=out_max)
     axs[1].set_title("First Channel of Output")
     axs[1].set_xlabel(f"min: {out_min:.2f}, max: {out_max:.2f}, shape: {out_arr.shape}")
     div = make_axes_locatable(axs[1])
@@ -137,18 +140,20 @@ def apply_and_show_random_image(f, path="nuclei_train_data"):
     cb.outline.set_visible(False)
 
     # center images and remove ticks
-    max_bounds = [max(ax.get_ybound()[1] for ax in axs), max(ax.get_xbound()[1] for ax in axs)]
+    max_bounds = [
+        max(ax.get_ybound()[1] for ax in axs),
+        max(ax.get_xbound()[1] for ax in axs),
+    ]
     for ax in axs:
         diffy = abs(ax.get_ybound()[1] - max_bounds[0])
         diffx = abs(ax.get_xbound()[1] - max_bounds[1])
-        ax.set_ylim([ax.get_ybound()[0]-diffy/2.,max_bounds[0]-diffy/2.])
-        ax.set_xlim([ax.get_xbound()[0] -diffx/2., max_bounds[1]-diffx/2.])
+        ax.set_ylim([ax.get_ybound()[0] - diffy / 2.0, max_bounds[0] - diffy / 2.0])
+        ax.set_xlim([ax.get_xbound()[0] - diffx / 2.0, max_bounds[1] - diffx / 2.0])
         ax.set_xticks([])
         ax.set_yticks([])
-        
+
         # for spine in ["bottom", "top", "left", "right"]: # get rid of box
         #     ax.spines[spine].set_visible(False)
-    
 
 
 def train(
@@ -232,6 +237,7 @@ def train(
             print("Stopping test early!")
             break
 
+
 def compute_receptive_field(depth, kernel_size, downsample_factor):
     fov = 1
     downsample_factor_prod = 1
@@ -259,19 +265,19 @@ def plot_receptive_field(unet, npseed=10, path="nuclei_train_data"):
     ds = NucleiDataset(path)
     np.random.seed(npseed)
     img_tensor = ds[np.random.randint(len(ds))][0]
-    
+
     img_arr = np.squeeze(img_tensor.numpy())
     print(img_arr.shape)
     fov = compute_receptive_field(unet.depth, unet.kernel_size, unet.downsample_factor)
 
-    fig=plt.figure(figsize=(5, 5))
-    plt.imshow(img_arr)#, cmap='gray')
-    
+    fig = plt.figure(figsize=(5, 5))
+    plt.imshow(img_arr)  # , cmap='gray')
+
     # visualize receptive field
-    xmin = img_arr.shape[1]/2 - fov/2
-    xmax = img_arr.shape[1]/2 + fov/2
-    ymin = img_arr.shape[0]/2 - fov/2
-    ymax = img_arr.shape[0]/2 + fov/2
+    xmin = img_arr.shape[1] / 2 - fov / 2
+    xmax = img_arr.shape[1] / 2 + fov / 2
+    ymin = img_arr.shape[0] / 2 - fov / 2
+    ymax = img_arr.shape[0] / 2 + fov / 2
     color = "red"
     plt.hlines(ymin, xmin, xmax, color=color, lw=3)
     plt.hlines(ymax, xmin, xmax, color=color, lw=3)
@@ -285,61 +291,79 @@ def compute_affinities(seg: np.ndarray, nhood: list):
     nhood = np.array(nhood)
 
     shape = seg.shape
-    nEdge = nhood.shape[0]
+    n_edges = nhood.shape[0]
     dims = nhood.shape[1]
-    aff = np.zeros((nEdge,) + shape, dtype=np.int32)
+    affinity = np.zeros((n_edges,) + shape, dtype=np.int32)
 
-    for e in range(nEdge):
-        aff[e, \
-          max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
-          max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] = \
-                      (seg[max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
-                          max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] == \
-                        seg[max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]), \
-                          max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] ) \
-                      * ( seg[max(0,-nhood[e,0]):min(shape[0],shape[0]-nhood[e,0]), \
-                          max(0,-nhood[e,1]):min(shape[1],shape[1]-nhood[e,1])] > 0 ) \
-                      * ( seg[max(0,nhood[e,0]):min(shape[0],shape[0]+nhood[e,0]), \
-                          max(0,nhood[e,1]):min(shape[1],shape[1]+nhood[e,1])] > 0 )
-                          
-    return aff
+    for e in range(n_edges):
+        affinity[
+            e,
+            max(0, -nhood[e, 0]) : min(shape[0], shape[0] - nhood[e, 0]),
+            max(0, -nhood[e, 1]) : min(shape[1], shape[1] - nhood[e, 1]),
+        ] = (
+            (
+                seg[
+                    max(0, -nhood[e, 0]) : min(shape[0], shape[0] - nhood[e, 0]),
+                    max(0, -nhood[e, 1]) : min(shape[1], shape[1] - nhood[e, 1]),
+                ]
+                == seg[
+                    max(0, nhood[e, 0]) : min(shape[0], shape[0] + nhood[e, 0]),
+                    max(0, nhood[e, 1]) : min(shape[1], shape[1] + nhood[e, 1]),
+                ]
+            )
+            * (
+                seg[
+                    max(0, -nhood[e, 0]) : min(shape[0], shape[0] - nhood[e, 0]),
+                    max(0, -nhood[e, 1]) : min(shape[1], shape[1] - nhood[e, 1]),
+                ]
+                > 0
+            )
+            * (
+                seg[
+                    max(0, nhood[e, 0]) : min(shape[0], shape[0] + nhood[e, 0]),
+                    max(0, nhood[e, 1]) : min(shape[1], shape[1] + nhood[e, 1]),
+                ]
+                > 0
+            )
+        )
+
+    return affinity
+
 
 def evaluate(gt_labels: np.ndarray, pred_labels: np.ndarray, th: float = 0.5):
     """Function to evaluate a segmentation."""
-    
+
     pred_labels_rel, _, _ = relabel_sequential(pred_labels)
     gt_labels_rel, _, _ = relabel_sequential(gt_labels)
 
-    overlay = np.array([pred_labels_rel.flatten(),
-                        gt_labels_rel.flatten()])
+    overlay = np.array([pred_labels_rel.flatten(), gt_labels_rel.flatten()])
 
     # get overlaying cells and the size of the overlap
     overlay_labels, overlay_labels_counts = np.unique(
-        overlay, return_counts=True, axis=1)
+        overlay, return_counts=True, axis=1
+    )
     overlay_labels = np.transpose(overlay_labels)
 
     # get gt cell ids and the size of the corresponding cell
     gt_labels_list, gt_counts = np.unique(gt_labels_rel, return_counts=True)
     gt_labels_count_dict = {}
-    
-    for (l, c) in zip(gt_labels_list, gt_counts):
+
+    for l, c in zip(gt_labels_list, gt_counts):
         gt_labels_count_dict[l] = c
 
     # get pred cell ids
-    pred_labels_list, pred_counts = np.unique(pred_labels_rel,
-                                              return_counts=True)
+    pred_labels_list, pred_counts = np.unique(pred_labels_rel, return_counts=True)
 
     pred_labels_count_dict = {}
-    for (l, c) in zip(pred_labels_list, pred_counts):
+    for l, c in zip(pred_labels_list, pred_counts):
         pred_labels_count_dict[l] = c
 
     num_pred_labels = int(np.max(pred_labels_rel))
     num_gt_labels = int(np.max(gt_labels_rel))
     num_matches = min(num_gt_labels, num_pred_labels)
-    
+
     # create iou table
-    iouMat = np.zeros((num_gt_labels+1, num_pred_labels+1),
-                      dtype=np.float32)
+    iouMat = np.zeros((num_gt_labels + 1, num_pred_labels + 1), dtype=np.float32)
 
     for (u, v), c in zip(overlay_labels, overlay_labels_counts):
         iou = c / (gt_labels_count_dict[v] + pred_labels_count_dict[u] - c)
@@ -350,7 +374,7 @@ def evaluate(gt_labels: np.ndarray, pred_labels: np.ndarray, th: float = 0.5):
 
     # use IoU threshold th
     if num_matches > 0 and np.max(iouMat) > th:
-        costs = -(iouMat > th).astype(float) - iouMat / (2*num_matches)
+        costs = -(iouMat > th).astype(float) - iouMat / (2 * num_matches)
         gt_ind, pred_ind = linear_sum_assignment(costs)
         assert num_matches == len(gt_ind) == len(pred_ind)
         match_ok = iouMat[gt_ind, pred_ind] > th
@@ -363,7 +387,8 @@ def evaluate(gt_labels: np.ndarray, pred_labels: np.ndarray, th: float = 0.5):
     precision = tp / max(1, tp + fp)
     recall = tp / max(1, tp + fn)
 
-    return ap, precision, recall, tp, fp, fn
+    return ap, precision, recall
+
 
 def plot_img_and_inter(img, sdt, label):
     fig = plt.figure(constrained_layout=False, figsize=(10, 3))
@@ -379,7 +404,8 @@ def plot_img_and_inter(img, sdt, label):
     plt.tight_layout()
     plt.show()
 
-def plot_three(image, intermediate, pred, label):
+
+def plot_three(image, intermediate, pred, label="Target"):
     fig = plt.figure(constrained_layout=False, figsize=(10, 3))
     spec = gridspec.GridSpec(ncols=3, nrows=1, figure=fig)
     ax1 = fig.add_subplot(spec[0, 0])
@@ -389,7 +415,7 @@ def plot_three(image, intermediate, pred, label):
     ax2.set_xlabel(label, fontsize=20)
     plt.imshow(intermediate, cmap="magma")
     ax3 = fig.add_subplot(spec[0, 2])
-    ax3.set_xlabel("PREDICTION", fontsize=20)
+    ax3.set_xlabel("Prediction", fontsize=20)
     t = plt.imshow(pred, cmap="magma")
     cbar = fig.colorbar(t, fraction=0.046, pad=0.04)
     tick_locator = ticker.MaxNLocator(nbins=3)
@@ -400,7 +426,9 @@ def plot_three(image, intermediate, pred, label):
     plt.tight_layout()
     plt.show()
 
-def plot_four(image, intermediate, pred, seg, label):
+
+def plot_four(image, intermediate, pred, seg, label="Target", cmap="nipy_spectral"):
+
     fig = plt.figure(constrained_layout=False, figsize=(10, 3))
     spec = gridspec.GridSpec(ncols=4, nrows=1, figure=fig)
     ax1 = fig.add_subplot(spec[0, 0])
@@ -417,7 +445,7 @@ def plot_four(image, intermediate, pred, seg, label):
     cbar.locator = tick_locator
     cbar.update_ticks()
     ax4 = fig.add_subplot(spec[0, 3])
-    ax4.imshow(seg, cmap=label_cmap, interpolation="none")
+    ax4.imshow(seg, cmap=cmap, interpolation="none")
     ax4.set_xlabel("Seg.", fontsize=20)
     _ = [ax.set_xticks([]) for ax in [ax1, ax2, ax3, ax4]]  # remove the xticks
     _ = [ax.set_yticks([]) for ax in [ax1, ax2, ax3, ax4]]  # remove the yticks
