@@ -293,13 +293,13 @@ show_random_dataset_image(train_data)
 # <u>Hints</u>:<br>
 #   - Loss function - [torch losses](https://pytorch.org/docs/stable/nn.html#loss-functions)
 #   - Optimizer - [torch optimizers](https://pytorch.org/docs/stable/optim.html)
-#   - Final_activation - there are a few options (only one is the best)
+#   - Final Activation - there are a few options (only one is the best)
 #       - [sigmoid](https://pytorch.org/docs/stable/generated/torch.nn.Sigmoid.html)
 #       - [tanh](https://pytorch.org/docs/stable/generated/torch.nn.Tanh.html#torch.nn.Tanh)
 #       - [relu](https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU)
 
 # %%
-# initialize the model
+# Initialize the model
 unet = UNet(
     depth=...,
     in_channels=...,
@@ -335,7 +335,7 @@ learning_rate = 1e-4
 optimizer = torch.optim.Adam(unet.parameters(), lr=learning_rate)
 
 
-for epoch in range(1):
+for epoch in range(10):
     train(
         unet,
         train_loader,
@@ -359,8 +359,7 @@ pred = unet(torch.unsqueeze(image, dim=0))
 image = np.squeeze(image.cpu())
 sdt = np.squeeze(sdt.cpu().numpy())
 pred = np.squeeze(pred.cpu().detach().numpy())
-
-plot_three(img[0], sdt, pred)
+plot_three(image, sdt, pred)
 
 
 # %% [markdown]
@@ -485,7 +484,7 @@ pred = np.squeeze(pred.cpu().detach().numpy())
 # Choose a threshold value to use to get the boundary mask.
 # Feel free to play around with the threshold.
 threshold = threshold_otsu(pred)
-print(f"Foreground threshold is {threshold}")
+print(f"Foreground threshold is {threshold:.3f}")
 
 # Get inner mask
 inner_mask = get_inner_mask(pred, threshold=threshold)
@@ -493,11 +492,10 @@ inner_mask = get_inner_mask(pred, threshold=threshold)
 # Get the segmentation
 seg = watershed_from_boundary_distance(pred, inner_mask, min_seed_distance=20)
 
-# %% 
+# %%
 # Visualize the results
-from local import plot_four
 
-plot_four(image, mask, pred, seg)
+plot_four(image, mask, pred, seg, label="Target", cmap=label_cmap)
 
 # %% [markdown]
 # Questions:
@@ -539,7 +537,15 @@ val_dataset = SDTDataset("nuclei_val_data", return_mask=True)
 val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False)
 unet.eval()
 
-ap_list, precision_list, recall_list, tp_list, fp_list, fn_list = [], [], [], [], [], []
+(
+    ap_list,
+    precision_list,
+    recall_list,
+) = (
+    [],
+    [],
+    [],
+)
 for idx, (image, mask, sdt) in enumerate(tqdm(val_dataloader)):
     image = image.to(device)
     pred = unet(image)
@@ -557,7 +563,7 @@ for idx, (image, mask, sdt) in enumerate(tqdm(val_dataloader)):
     pred_labels = watershed_from_boundary_distance(
         pred, inner_mask, id_offset=0, min_seed_distance=20
     )
-    ap, precision, recall, tp, fp, fn = evaluate(gt_labels, pred_labels)
+    ap, precision, recall = evaluate(gt_labels, pred_labels)
     ap_list.append(ap)
     precision_list.append(precision)
     recall_list.append(recall)
@@ -571,9 +577,9 @@ print(f"Mean Recall is {np.mean(recall_list):.3f}")
 # ## Section 4: Affinities
 # %% [markdown]
 # <i>What are affinities? </i><br>
-# Here we consider not just the pixel but also its direct neighbors. 
+# Here we consider not just the pixel but also its direct neighbors.
 # <br> Imagine there is an edge between two pixels if they are in the same class and no edge if not.
-# <br> If we then take all pixels that are directly and indirectly connected by edges, we get an instance. 
+# <br> If we then take all pixels that are directly and indirectly connected by edges, we get an instance.
 # <br> Essentially, we label edges between neighboring pixels as “connected” or “cut”, rather than labeling the pixels themselves. <br>
 # Here, below we show the affinity in x + affinity in y.
 
@@ -715,7 +721,7 @@ image = np.squeeze(image.cpu())
 mask = np.squeeze(mask.cpu().numpy())
 pred = np.squeeze(pred.cpu().detach().numpy())
 
-plot_three(image, mask[0] + mask[1], pred[0] + pred[1], label="AFFINITY")
+plot_three(image, mask[0] + mask[1], pred[0] + pred[1], label="Affinity")
 
 # %% [markdown]
 # Let's also evaluate the model performance.
@@ -725,7 +731,15 @@ val_dataset = AffinityDataset("nuclei_val_data", return_mask=True)
 val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
 unet.eval()
 
-ap_list, precision_list, recall_list, tp_list, fp_list, fn_list = [], [], [], [], [], []
+(
+    ap_list,
+    precision_list,
+    recall_list,
+) = (
+    [],
+    [],
+    [],
+)
 for idx, (image, mask, sdt) in enumerate(tqdm(val_loader)):
     image = image.to(device)
     pred = unet(image)
@@ -742,7 +756,7 @@ for idx, (image, mask, sdt) in enumerate(tqdm(val_loader)):
     pred_labels = watershed_from_boundary_distance(
         boundary_distances, inner_mask, min_seed_distance=20
     )
-    ap, precision, recall, tp, fp, fn = evaluate(gt_labels, pred_labels)
+    ap, precision, recall = evaluate(gt_labels, pred_labels)
     ap_list.append(ap)
     precision_list.append(precision)
     recall_list.append(recall)
@@ -759,26 +773,26 @@ print(f"Mean Recall is {np.mean(recall_list):.3f}")
 # <br> take a look at the full built-in models and try to apply one to the dataset used in this exercise.
 # <br> -[cellpose github](https://github.com/MouseLand/cellpose)
 # <br> -[cellpose documentation](https://cellpose.readthedocs.io/en/latest/)
+#
+#
 
-
-
-# %% tags=['solution']
-# pip install cellpose
+# %% tags=["solution"]
+# !pip install cellpose
 from cellpose import models
 
 # implement a cellpose pretrained model
 
 
 # evaluation
-ap_list, precision_list, recall_list, tp_list, fp_list, fn_list = [], [], [], [], [], []
+ap_list, precision_list, recall_list = [], [], []
 for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
     gt_labels = np.squeeze(mask.cpu().numpy())
     image = np.squeeze(image.cpu().numpy())
 
     # evaluate the model to get predictions
-    pred_labels ... = ...
+    pred_labels = ...
 
-    ap, precision, recall, tp, fp, fn = evaluate(gt_labels, pred_labels[0])
+    ap, precision, recall = evaluate(gt_labels, pred_labels[0])
     ap_list.append(ap)
     precision_list.append(precision)
     recall_list.append(recall)
@@ -786,20 +800,19 @@ for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
 print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
-# %% tags=['solution']
-# pip install cellpose
-from cellpose import models
+# %% tags=["solution"]
+# !pip install cellpose
 
-model = models.Cellpose(model_type="nuclei") # remove this line
+model = models.Cellpose(model_type="nuclei")
 channels = [[0, 0]]
 
-ap_list, precision_list, recall_list, tp_list, fp_list, fn_list = [], [], [], [], [], []
+ap_list, precision_list, recall_list = [], [], []
 for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
     gt_labels = np.squeeze(mask.cpu().numpy())
     image = np.squeeze(image.cpu().numpy())
     pred_labels, _, _, _ = model.eval([image], diameter=None, channels=channels)
 
-    ap, precision, recall, tp, fp, fn = evaluate(gt_labels, pred_labels[0])
+    ap, precision, recall = evaluate(gt_labels, pred_labels[0])
     ap_list.append(ap)
     precision_list.append(precision)
     recall_list.append(recall)
