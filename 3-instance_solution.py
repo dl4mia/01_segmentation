@@ -23,8 +23,6 @@
 # %% [markdown]
 # ## Import Packages
 # %%
-import matplotlib.pyplot as plt
-from matplotlib import gridspec, ticker
 from matplotlib.colors import ListedColormap
 import numpy as np
 import os
@@ -34,7 +32,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from torchvision import transforms
 from scipy.ndimage import distance_transform_edt, binary_erosion
-from local import train, NucleiDataset
+from local import train, NucleiDataset, plot_img_and_inter, plot_three, plot_four
 from unet import UNet
 from local import show_random_dataset_image
 from tqdm import tqdm
@@ -43,7 +41,7 @@ from skimage.filters import threshold_otsu
 
 
 # %%
-device = "cpu"  # 'cuda', 'cpu', 'mps'
+device = "cuda"  # 'cuda', 'cpu', 'mps'
 # make sure gpu is available. Please call a TA if this cell fails
 assert torch.cuda.is_available()
 
@@ -119,7 +117,6 @@ def compute_sdt(labels: np.ndarray, constant: float = 0.5, scale: int = 5):
 # Below is a small function to visualize the signed distance transform (SDT). <br> Use it to validate your function.
 # %%
 # Visualize the signed distance transform using the function you wrote above.
-from local import plot_img_and_inter
 
 train_data = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
 idx = np.random.randint(len(train_data))  # take a random sample
@@ -345,10 +342,7 @@ for epoch in range(1):
 # Next, let's run the inference using our trained model and visualize some random samples.
 
 # %%
-from local import plot_three
-
 val_data = SDTDataset("nuclei_val_data")
-
 unet.eval()
 idx = np.random.randint(len(val_data))  # take a random sample
 image, sdt = val_data[idx]  # get the image and the nuclei masks
@@ -398,7 +392,6 @@ def find_local_maxima(distance_transform, min_seed_distance):
 
 
 # %% tags=["solution"]
-from scipy.ndimage import label, maximum_filter
 
 
 def find_local_maxima(distance_transform, min_seed_distance):
