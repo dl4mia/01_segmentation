@@ -22,8 +22,8 @@ class NucleiDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
     def __init__(self, root_dir, transform=None, img_transform=None):
-        self.root_dir = root_dir  # the directory with all the training samples
-        self.samples = os.listdir(root_dir)  # list the samples
+        self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
+        self.samples = os.listdir(self.root_dir)  # list the samples
         self.transform = (
             transform  # transformations to apply to both inputs and targets
         )
@@ -195,6 +195,8 @@ def train(
         prediction = model(x)
         if prediction.shape != y.shape:
             y = crop(y, prediction)
+        if y.dtype != prediction.dtype:
+            y = y.type(prediction.dtype)
         loss = loss_function(prediction, y)
 
         # backpropagate the loss and adjust the parameters

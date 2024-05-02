@@ -4,14 +4,14 @@ eval "$(conda shell.bash hook)"
 mamba create -n segmentation python=3.10 -y
 mamba activate segmentation
 # Install additional requirements
-mamba install -c pytorch -c nvidia --file requirements.txt -y
+mamba install -c pytorch -c nvidia -c conda-forge --file requirements.txt -y
 # Build the notebooks
 sh prepare-exercise.sh
 
-# Download and extract data, etc.
+# Download and extract data, etc. (Unnecessary because the TAs set it up, but leaving here for records)
 #wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1L344AoTTx-mu9MyNt-2iZ5A3ww3tC_Zp' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1L344AoTTx-mu9MyNt-2iZ5A3ww3tC_Zp" -O kaggle_data.zip && rm -rf /tmp/cookies.txt
-gdown -O kaggle_data.zip 1ahuduC_4Ex84R7qKNRzAY6PiLRWX_J3I
-unzip -u -qq kaggle_data.zip && rm kaggle_data.zip
+# gdown -O kaggle_data.zip 1ahuduC_4Ex84R7qKNRzAY6PiLRWX_J3I
+# unzip -u -qq kaggle_data.zip && rm kaggle_data.zip
 
 
 # Return to base environment
