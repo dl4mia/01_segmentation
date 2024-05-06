@@ -388,12 +388,6 @@ validate(
 )
 
 # %% [markdown]
-# <div class="alert alert-block alert-info">
-#     <b>Task 1.3</b>: Evaluate your first model using the Dice Coefficient. How does it perform? If you trained two models,
-#     do the scores agree with your visual determination of which model was better?
-# </div>
-
-# %% [markdown]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 1.2</h2>
 #
