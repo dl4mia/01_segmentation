@@ -425,22 +425,82 @@ validate(
 
 # %%
 train_data = NucleiDataset("nuclei_train_data", transforms_v2.RandomCrop(256))
-augmented_data = NucleiDataset(
+
+# Note this augmented data uses extreme augmentations for visualization. It will not train well
+example_augmented_data = NucleiDataset(
     "nuclei_train_data",
-    transforms_v2.RandomCrop(256),
-    img_transform=transforms_v2.Compose(
-        [transforms_v2.GaussianBlur(5, sigma=10.0), transforms_v2.RandomRotation(45)]
+    transforms_v2.Compose(
+        [transforms_v2.RandomRotation(45), transforms_v2.RandomCrop(256)]
     ),
+    img_transform=transforms_v2.Compose([transforms_v2.GaussianBlur(5, sigma=10.0)]),
 )
 
 # %%
-show_random_augmentation_comparison(train_data, augmented_data)
+show_random_augmentation_comparison(train_data, example_augmented_data)
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 2.1</b>: Now create an augmented dataset with an augmentation of your choice.
+# </div>
+
+# %%
+augmented_data = ...
+
+# %% tags=["solution"]
+augmented_data = NucleiDataset(
+    "nuclei_train_data",
+    transforms_v2.Compose(
+        [transforms_v2.RandomRotation(45), transforms_v2.RandomCrop(256)]
+    ),
+    img_transform=transforms_v2.Compose([transforms_v2.GaussianBlur(5, sigma=1.0)]),
+)
 
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-#     <b>Task 2.1</b>: Now retrain your model with your favorite augmented dataset. Did your model improve?
+#     <b>Task 2.2</b>: Now retrain your model with your favorite augmented dataset. Did your model improve?
 # </div>
+
+# %%
+
+unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2)
+loss = nn.MSELoss()
+optimizer = torch.optim.Adam(unet.parameters())
+augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True)
+
+...
+
+# %% tags=["solution"]
+
+unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2)
+loss = nn.MSELoss()
+optimizer = torch.optim.Adam(unet.parameters())
+augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True)
+
+for epoch in range(10):
+    train(
+        unet,
+        augmented_loader,
+        optimizer,
+        loss,
+        epoch,
+    )
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 2.3</b>: Now evaluate your model. Did your model improve?
+# </div>
+
+# %%
+validate(...)
+
+# %% tags=["solution"]
+validate(
+    unet,
+    val_loader,
+    loss,
+    DiceCoefficient(),
+)
 
 # %% [markdown]
 # <hr style="height:2px;">
