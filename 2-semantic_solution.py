@@ -218,13 +218,6 @@ assert dice(wrong_prediction, target) == 0.0, dice(wrong_prediction, target)
 # if the target is `[0,1]` then a prediction of `[0,2]` will score higher than a prediction of `[0,3]`.
 
 # %% [markdown]
-# <div class="alert alert-block alert-info">
-#     <b>Task 2.1</b>: Fix in all the TODOs to make the validate function work. If confused, you can use this
-# <a href="https://pytorch.org/tutorials/beginner/basics/optimization_tutorial.html">PyTorch tutorial</a> as a template
-# </div>
-
-
-# %% [markdown]
 # <div class="alert alert-block alert-success">
 #     <h2>Checkpoint 1.1 </h2>
 #
@@ -237,6 +230,12 @@ assert dice(wrong_prediction, target) == 0.0, dice(wrong_prediction, target)
 # </div>
 #
 # <hr style="height:2px;">
+
+# %% [markdown]
+# <div class="alert alert-block alert-info">
+#     <b>Task 1.3</b>: Fix in all the TODOs to make the validate function work. If confused, you can use this
+# <a href="https://pytorch.org/tutorials/beginner/basics/optimization_tutorial.html">PyTorch tutorial</a> as a template
+# </div>
 
 
 # %%
