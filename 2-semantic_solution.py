@@ -71,7 +71,6 @@ for epoch in range(10):
         optimizer,
         loss,
         epoch,
-        device="cpu",
     )
 
 
