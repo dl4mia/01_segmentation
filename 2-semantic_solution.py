@@ -152,7 +152,7 @@ class DiceCoefficient(nn.Module):
         super().__init__()
         self.eps = eps
 
-    # the dice coefficient of two sets represented as vectors a, b ca be
+    # the dice coefficient of two sets represented as vectors a, b can be
     # computed as (2 *|a b| / (a^2 + b^2))
     def forward(self, prediction, target):
         intersection = ...
@@ -196,7 +196,7 @@ assert dice(wrong_prediction, target) == 0.0, dice(wrong_prediction, target)
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-# <b>Task 1.2</b>: What happes if your predictions are not discrete elements of {0,1}?
+# <b>Task 1.2</b>: What happens if your predictions are not discrete elements of {0,1}?
 #     <ol>
 #         <li>What if the predictions are in range (0,1)?</li>
 #         <li>What if the predictions are in range ($-\infty$,$\infty$)?</li>
