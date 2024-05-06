@@ -1,18 +1,12 @@
 # %% [markdown]
-# # Exercise 05: Semantic Segmentation
+# # Semantic Segmentation
 #
 # <hr style="height:2px;">
 #
 # In this notebook, we adapt our 2D U-Net for better nuclei segmentations in the Kaggle Nuclei dataset.
 #
-# TODO: Authorship?
 #
-# Written by Valentyna Zinchenko, Constantin Pape and William Patton.
-
-# %% [markdown]
-# <div class="alert alert-danger">
-# Please use kernel <code>segmentation</code> for this exercise.
-# </div>
+# Written by William Patton, Valentyna Zinchenko, and Constantin Pape.
 
 # %% [markdown]
 # Our goal is to produce a model that can take an image as input and produce a segmentation as shown in this table.
