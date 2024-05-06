@@ -418,6 +418,10 @@ validate(
 # %% [markdown]
 # Here is an example augmented dataset. Use it to see how it affects your data, then play around with at least
 # 2 other augmentations.
+# There are two types of augmentations: `transform` and `img_transform`. The first one is applied to both the
+# image and the mask, the second is only applied to the image. This is useful if you want to apply augmentations
+# that spatially distort your data and you want to make sure the same distortion is applied to the mask and image.
+# `img_transform` is useful for augmentations that don't make sense to apply to the mask, like blurring.
 
 # %%
 train_data = NucleiDataset("nuclei_train_data", transforms_v2.RandomCrop(256))
