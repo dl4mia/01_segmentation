@@ -75,7 +75,8 @@ label_cmap = ListedColormap(np.load("cmap_60.npy"))
 # </div>
 # %%
 # Write a function to calculate SDT.
-# (Hint: Use `distance_transform_edt` and `binary_erosion` which are imported in the first cell.)
+# (Hint: Use `distance_transform_edt`)
+from scipy.ndimage import distance_transform_edt
 
 
 def compute_sdt(labels: np.ndarray, scale: int = 5):
@@ -162,7 +163,7 @@ class SDTDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
-        self.root_dir = root_dir  # the directory with all the training samples
+        self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
         self.samples = os.listdir(root_dir)  # list the samples
         self.return_mask = return_mask
         self.transform = (
@@ -204,12 +205,13 @@ class SDTDataset(Dataset):
         if self.img_transform is not None:
             image = self.img_transform(image)
         if self.return_mask is True:
-            return image, mask, sdt
+            return image, transforms.ToTensor()(mask), sdt_mask
         else:
             return image, sdt
 
     def create_sdt_target(self):
         # TODO: Fill in function
+        # make sure this function is returning a torch tensor
 
         return
 
@@ -219,7 +221,7 @@ class SDTDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
-        self.root_dir = root_dir  # the directory with all the training samples
+        self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
         self.samples = os.listdir(root_dir)  # list the samples
         self.return_mask = return_mask
         self.transform = (
@@ -311,10 +313,20 @@ unet = UNet(
 
 # Choose a loss function
 
+learning_rate=1e-4
 # Choose an optimizer
 
-# Write a training loop and train for 10 epochs
-
+# use the train function provided in local to train the model for 10 epochs
+for epoch in range(10):
+    train(
+        model=...
+        loader=...
+        optimizer=...
+        loss_function=...
+        epoch=...
+        log_interval=10,
+        device=device,
+    )
 # %% tags=["solution"]
 unet = UNet(
     depth=1,
@@ -370,7 +382,7 @@ plot_three(image, sdt, pred)
 # <hr style="height:2px;">
 #
 # ## Section 2: Post-Processing
-# - See here for a nice overview: [scikit-image watershed](https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_watershed.html)
+# - See here for a nice overview: [open-cv-image watershed](https://docs.opencv.org/4.x/d3/db4/tutorial_py_watershed.html), although the specifics of our code will be different
 # - Given the distance transform (the output of our model), we first need to find the local maxima that will be used as seed points
 # - The watershed algorithm then expands each seed out in a local "basin" until the segments touch.
 
@@ -408,6 +420,10 @@ def find_local_maxima(distance_transform, min_seed_distance):
 
     return seeds, n
 
+# %%
+# test your function
+from local import test_maximum
+test_maximum(find_local_maxima)
 
 # %% [markdown]
 # We now use this function to find the seeds for the watershed.
@@ -445,7 +461,7 @@ def get_inner_mask(pred, threshold):
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
-# <b>Task 2.2</b>: <br> Get the watershed segmentation.
+# <b>Task 2.2</b>: <br> Use the model to generate a predicted SDT and then use the watershed function we defined above to get post-process into a segmentation
 # </div>
 
 # %%
@@ -454,6 +470,9 @@ image, mask = val_data[idx]  # get the image and the nuclei masks
 
 # get the model prediction
 # Hint: make sure set the model to evaluation
+# Hint: check the dims of the image, remember they should be [batch, channels, x, y]
+# Hint: remember to move model outputs to the cpu and check their dimensions (as you did in task 1.3 visualization)
+
 
 # Choose a threshold value to use to get the boundary mask
 thresh = ...
@@ -596,7 +615,7 @@ class AffinityDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
-        self.root_dir = root_dir  # the directory with all the training samples
+        self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
         self.samples = os.listdir(root_dir)  # list the samples
         self.return_mask = return_mask
         self.transform = (
@@ -673,7 +692,7 @@ show_random_dataset_image(train_data)
 # training loop
 
 
-# %% tags=["solutions"]
+# %% tags=["solution"]
 unet = UNet(
     depth=1,
     in_channels=1,
@@ -773,9 +792,11 @@ print(f"Mean Recall is {np.mean(recall_list):.3f}")
 # <br> -[cellpose documentation](https://cellpose.readthedocs.io/en/latest/)
 #
 #
+#%%
+# install cellpose
+pip install cellpose
 
-# %% tags=["solution"]
-# !pip install cellpose
+#%%
 from cellpose import models
 
 # implement a cellpose pretrained model
@@ -799,7 +820,7 @@ print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
 # %% tags=["solution"]
-# !pip install cellpose
+# pip install cellpose
 
 model = models.Cellpose(model_type="nuclei")
 channels = [[0, 0]]
