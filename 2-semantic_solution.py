@@ -75,11 +75,12 @@ for epoch in range(10):
 
 
 # %%
-# TODO: Implement a function to show a random image from the dataset with the prediction given a UNet
+# Show some predictions on the train data
 show_random_dataset_image(train_data)
 show_random_dataset_image_with_prediction(train_data, unet)
 
 # %%
+# Show some predictions on the validation data
 show_random_dataset_image(val_data)
 show_random_dataset_image_with_prediction(val_data, unet)
 
