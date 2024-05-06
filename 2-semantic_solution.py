@@ -366,14 +366,18 @@ def validate(
 
 
 # %% [markdown]
-# <div class="alert alert-block alert-warning">
-#     Quick sanity check for your validate function to make sure no errors are thrown
+# <div class="alert alert-block alert-info">
+#     <b>Task 1.4</b>: Evaluate your first model using the Dice Coefficient. How does it perform? If you trained two models,
+#     do the scores agree with your visual determination of which model was better?
 # </div>
 
 # %%
-# simple_net = UNet(1, 1, depth=1, final_activation=None)
 
-# build the dice coefficient metric
+# Evaluate your model here
+
+# %% tags=["solution"]
+
+# Evaluate your model here
 
 validate(
     unet,
