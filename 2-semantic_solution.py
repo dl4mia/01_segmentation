@@ -32,6 +32,9 @@ import torch.nn as nn
 import torchvision.transforms.v2 as transforms_v2
 
 # %%
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+# %%
 # make sure gpu is available. Please call a TA if this cell fails
 assert torch.cuda.is_available()
 
@@ -60,29 +63,22 @@ train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
 val_data = NucleiDataset("nuclei_val_data", transforms_v2.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
-unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2)
+unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2).to(device)
 loss = nn.MSELoss()
 optimizer = torch.optim.Adam(unet.parameters())
 
 for epoch in range(10):
-    train(
-        unet,
-        train_loader,
-        optimizer,
-        loss,
-        epoch,
-    )
+    train(unet, train_loader, optimizer, loss, epoch, device=device)
 
 
 # %%
 # Show some predictions on the train data
 show_random_dataset_image(train_data)
-show_random_dataset_image_with_prediction(train_data, unet)
-
+show_random_dataset_image_with_prediction(train_data, unet, device)
 # %%
 # Show some predictions on the validation data
 show_random_dataset_image(val_data)
-show_random_dataset_image_with_prediction(val_data, unet)
+show_random_dataset_image_with_prediction(val_data, unet, device)
 
 # %% [markdown]
 
@@ -397,6 +393,7 @@ validate(
     loss_function=torch.nn.MSELoss(),
     metric=DiceCoefficient(),
     step=0,
+    device=device,
 )
 
 # %% [markdown]
@@ -475,7 +472,7 @@ augmented_data = NucleiDataset(
 
 # %%
 
-unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2)
+unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2).to(device)
 loss = nn.MSELoss()
 optimizer = torch.optim.Adam(unet.parameters())
 augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True)
@@ -484,19 +481,13 @@ augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True)
 
 # %% tags=["solution"]
 
-unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2)
+unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2).to(device)
 loss = nn.MSELoss()
 optimizer = torch.optim.Adam(unet.parameters())
 augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True)
 
 for epoch in range(10):
-    train(
-        unet,
-        augmented_loader,
-        optimizer,
-        loss,
-        epoch,
-    )
+    train(unet, augmented_loader, optimizer, loss, epoch, device=device)
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
@@ -507,12 +498,7 @@ for epoch in range(10):
 validate(...)
 
 # %% tags=["solution"]
-validate(
-    unet,
-    val_loader,
-    loss,
-    DiceCoefficient(),
-)
+validate(unet, val_loader, loss, DiceCoefficient(), device=device)
 
 # %% [markdown]
 # <hr style="height:2px;">
@@ -596,7 +582,7 @@ logger = SummaryWriter("runs/Unet")
 # Use the unet you expect to work the best!
 model = UNet(
     depth=4, in_channels=1, out_channels=1, num_fmaps=2, final_activation="Sigmoid"
-)
+).to(device)
 
 # use adam optimizer
 optimizer = torch.optim.Adam(model.parameters())
@@ -618,6 +604,7 @@ for epoch in range(n_epochs):
         epoch=epoch,
         log_interval=25,
         tb_logger=logger,
+        device=device,
     )
     step = epoch * len(train_loader)
     # validate
@@ -701,7 +688,7 @@ class UNetGN(UNet):
 
 
 # %%
-model = UNetGN(1, 1, final_activation=nn.Sigmoid())
+model = UNetGN(1, 1, final_activation=nn.Sigmoid()).to(device)
 
 optimizer = torch.optim.Adam(model.parameters())
 
@@ -723,9 +710,18 @@ for epoch in range(n_epochs):
         epoch=epoch,
         log_interval=5,
         tb_logger=logger,
+        device=device,
     )
     step = epoch * len(train_loader)
-    validate(model, val_loader, loss_function, metric, step=step, tb_logger=logger)
+    validate(
+        model,
+        val_loader,
+        loss_function,
+        metric,
+        step=step,
+        tb_logger=logger,
+        device=device,
+    )
 
 
 # %% [markdown]
@@ -749,7 +745,7 @@ logger = SummaryWriter("runs/UNet5layers")
 # %% tags=["solution"]
 # Experiment with more layers. For example UNet with depth 5
 
-model = UNet(1, 1, depth=5, final_activation=nn.Sigmoid())
+model = UNet(1, 1, depth=5, final_activation=nn.Sigmoid()).to(device)
 
 optimizer = torch.optim.Adam(model.parameters())
 
@@ -773,9 +769,12 @@ for epoch in range(n_epochs):
         epoch=epoch,
         log_interval=5,
         tb_logger=logger,
+        device=device,
     )
     step = epoch * len(train_loader)
-    validate(model, val_loader, loss, metric, step=step, tb_logger=logger)
+    validate(
+        model, val_loader, loss, metric, step=step, tb_logger=logger, device=device
+    )
 
 
 # %% [markdown]
@@ -838,7 +837,7 @@ loss_func = ...
 
 # %% tags=["solution"]
 # Experiment with Dice Loss
-net = UNet(1, 1, final_activation=nn.Sigmoid())
+net = UNet(1, 1, final_activation=nn.Sigmoid()).device()
 optimizer = torch.optim.Adam(net.parameters())
 metric = DiceCoefficient()
 loss_func = dice_loss
@@ -856,9 +855,12 @@ for epoch in range(n_epochs):
         epoch=epoch,
         log_interval=5,
         tb_logger=logger,
+        device=device,
     )
     step = epoch * len(train_loader)
-    validate(net, val_loader, loss_func, metric, step=step, tb_logger=logger)
+    validate(
+        net, val_loader, loss_func, metric, step=step, tb_logger=logger, device=device
+    )
 
 
 # %% [markdown]
@@ -875,7 +877,7 @@ loss_func = ...
 logger = SummaryWriter("runs/UNetGN_diceloss")
 
 # %% tags=["solution"]
-net = UNetGN(1, 1, final_activation=nn.Sigmoid())
+net = UNetGN(1, 1, final_activation=nn.Sigmoid()).to(device)
 optimizer = torch.optim.Adam(net.parameters())
 metric = DiceCoefficient()
 loss_func = dice_loss
@@ -893,9 +895,12 @@ for epoch in range(n_epochs):
         epoch=epoch,
         log_interval=5,
         tb_logger=logger,
+        device=device,
     )
     step = epoch * len(train_loader)
-    validate(net, val_loader, loss_func, metric, step=step, tb_logger=logger)
+    validate(
+        net, val_loader, loss_func, metric, step=step, tb_logger=logger, device=device
+    )
 
 
 # %% [markdown]
@@ -910,7 +915,7 @@ metric = ...
 loss_func = ...
 
 # %% tags=["solution"]
-net = UNetGN(1, 1, depth=5, final_activation=nn.Sigmoid())
+net = UNetGN(1, 1, depth=5, final_activation=nn.Sigmoid()).to(device)
 optimizer = torch.optim.Adam(net.parameters())
 metric = DiceCoefficient()
 loss_func = dice_loss
@@ -927,6 +932,9 @@ for epoch in range(n_epochs):
         epoch=epoch,
         log_interval=5,
         tb_logger=logger,
+        device=device,
     )
     step = epoch * len(train_loader)
-    validate(net, val_loader, loss_func, metric, step=step, tb_logger=logger)
+    validate(
+        net, val_loader, loss_func, metric, step=step, tb_logger=logger, device=device
+    )
