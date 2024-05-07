@@ -22,11 +22,14 @@ class NucleiDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
     def __init__(self, root_dir, transform=None, img_transform=None):
-        self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
+        self.root_dir = (
+            "/group/dl4miacourse/segmentation/" + root_dir
+        )  # the directory with all the training samples
         self.samples = os.listdir(self.root_dir)  # list the samples
         self.transform = (
             transform  # transformations to apply to both inputs and targets
         )
+
         self.img_transform = img_transform  # transformations to apply to raw image only
         #  transformations to apply just to inputs
         inp_transforms = transforms.Compose(
@@ -40,11 +43,15 @@ class NucleiDataset(Dataset):
         self.loaded_imgs = [None] * len(self.samples)
         self.loaded_masks = [None] * len(self.samples)
         for sample_ind in range(len(self.samples)):
-            img_path = os.path.join(self.root_dir, self.samples[sample_ind], "image.tif")
+            img_path = os.path.join(
+                self.root_dir, self.samples[sample_ind], "image.tif"
+            )
             image = Image.open(img_path)
             image.load()
             self.loaded_imgs[sample_ind] = inp_transforms(image)
-            mask_path = os.path.join(self.root_dir, self.samples[sample_ind], "mask.tif")
+            mask_path = os.path.join(
+                self.root_dir, self.samples[sample_ind], "mask.tif"
+            )
             mask = Image.open(mask_path)
             mask.load()
             self.loaded_masks[sample_ind] = transforms.ToTensor()(mask)
@@ -70,6 +77,7 @@ class NucleiDataset(Dataset):
         if self.img_transform is not None:
             image = self.img_transform(image)
         return image, mask
+
 
 def show_random_dataset_image(dataset):
     idx = np.random.randint(0, len(dataset))  # take a random sample
@@ -404,20 +412,24 @@ def evaluate(gt_labels: np.ndarray, pred_labels: np.ndarray, th: float = 0.5):
     fn = num_gt_labels - tp
     precision = tp / max(1, tp + fp)
     recall = tp / max(1, tp + fn)
-    accuracy = tp / num_gt_labels
+    accuracy = tp / (tp + fp + fn)
 
-    return ap, precision, recall, accuracy
+    return precision, recall, accuracy
 
 
-def plot_img_and_inter(img, sdt, label):
+def plot_two(img: np.ndarray, sdt: np.ndarray, label: str):
+    """
+    Helper function to plot an image and the auxiliary (intermediate)
+    representation of the target.
+    """
     fig = plt.figure(constrained_layout=False, figsize=(10, 3))
     spec = gridspec.GridSpec(ncols=2, nrows=1, figure=fig)
     ax1 = fig.add_subplot(spec[0, 0])
     ax1.set_xlabel("Image", fontsize=20)
-    plt.imshow(img[0], cmap="magma")
+    plt.imshow(img, cmap="magma")
     ax2 = fig.add_subplot(spec[0, 1])
     ax2.set_xlabel(label, fontsize=20)
-    t=plt.imshow(sdt, cmap="magma")
+    t = plt.imshow(sdt, cmap="magma")
     cbar = fig.colorbar(t, fraction=0.046, pad=0.04)
     tick_locator = ticker.MaxNLocator(nbins=3)
     cbar.locator = tick_locator
@@ -428,7 +440,13 @@ def plot_img_and_inter(img, sdt, label):
     plt.show()
 
 
-def plot_three(image, intermediate, pred, label="Target"):
+def plot_three(
+    image: np.ndarray, intermediate: np.ndarray, pred: np.ndarray, label: str = "Target"
+):
+    """
+    Helper function to plot an image, the auxiliary (intermediate)
+    representation of the target and the model prediction.
+    """
     fig = plt.figure(constrained_layout=False, figsize=(10, 3))
     spec = gridspec.GridSpec(ncols=3, nrows=1, figure=fig)
     ax1 = fig.add_subplot(spec[0, 0])
@@ -450,7 +468,18 @@ def plot_three(image, intermediate, pred, label="Target"):
     plt.show()
 
 
-def plot_four(image, intermediate, pred, seg, label="Target", cmap="nipy_spectral"):
+def plot_four(
+    image: np.ndarray,
+    intermediate: np.ndarray,
+    pred: np.ndarray,
+    seg: np.ndarray,
+    label: str = "Target",
+    cmap: str = "nipy_spectral",
+):
+    """
+    Helper function to plot an image, the auxiliary (intermediate)
+    representation of the target, the model prediction and the predicted segmentation mask.
+    """
 
     fig = plt.figure(constrained_layout=False, figsize=(10, 3))
     spec = gridspec.GridSpec(ncols=4, nrows=1, figure=fig)
@@ -475,19 +504,20 @@ def plot_four(image, intermediate, pred, seg, label="Target", cmap="nipy_spectra
     plt.tight_layout()
     plt.show()
 
+
 def test_maximum(find_local_maxima):
-    true_array = np.zeros((28,28))
-    locs_x = np.random.randint(0,28,size=(3))
-    locs_y = np.random.randint(0,28,size=(3))
-    true_array[locs_x,locs_y] = 1
+    true_array = np.zeros((28, 28))
+    locs_x = np.random.randint(0, 28, size=(3))
+    locs_y = np.random.randint(0, 28, size=(3))
+    true_array[locs_x, locs_y] = 1
     test_array = find_local_maxima(true_array, 3)[0] > 1
 
     fig = plt.figure(constrained_layout=False, figsize=(10, 3))
     spec = gridspec.GridSpec(ncols=2, nrows=1, figure=fig)
     ax1 = fig.add_subplot(spec[0, 0])
     plt.imshow(true_array)
-    plt.title('TRUE MAXIMA')
+    plt.title("TRUE MAXIMA")
     ax1 = fig.add_subplot(spec[0, 1])
     plt.imshow(test_array)
-    plt.title('FOUND MAXIMA')
+    plt.title("FOUND MAXIMA")
     return
