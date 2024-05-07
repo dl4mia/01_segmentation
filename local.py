@@ -403,7 +403,6 @@ def evaluate(gt_labels: np.ndarray, pred_labels: np.ndarray, th: float = 0.5):
         tp = 0
     fp = num_pred_labels - tp
     fn = num_gt_labels - tp
-    ap = tp / max(1, tp + fn + fp)
     precision = tp / max(1, tp + fp)
     recall = tp / max(1, tp + fn)
     accuracy = tp / num_gt_labels

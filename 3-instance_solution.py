@@ -166,20 +166,32 @@ class SDTDataset(Dataset):
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
         self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
-        self.samples = os.listdir(root_dir)  # list the samples
+        self.samples = os.listdir(self.root_dir)  # list the samples
         self.return_mask = return_mask
         self.transform = (
             transform  # transformations to apply to both inputs and targets
         )
         self.img_transform = img_transform  # transformations to apply to raw image only
         #  transformations to apply just to inputs
-        self.inp_transforms = transforms.Compose(
+        inp_transforms = transforms.Compose(
             [
+                transforms.Greyscale(),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),  # 0.5 = mean and 0.5 = variance
             ]
         )
 
+        self.loaded_imgs = [None] * len(self.samples)
+        self.loaded_masks = [None] * len(self.samples)
+        for sample_ind in range(len(self.samples)):
+            img_path = os.path.join(self.root_dir, self.samples[sample_ind], "image.tif")
+            image = Image.open(img_path)
+            image.load()
+            self.loaded_imgs[sample_ind] = inp_transforms(image)
+            mask_path = os.path.join(self.root_dir, self.samples[sample_ind], "mask.tif")
+            mask = Image.open(mask_path)
+            mask.load()
+            self.loaded_masks[sample_ind] = transforms.ToTensor()(mask)
     # get the total number of samples
     def __len__(self):
         return len(self.samples)
@@ -226,7 +238,7 @@ class SDTDataset(Dataset):
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
         self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
-        self.samples = os.listdir(root_dir)  # list the samples
+        self.samples = os.listdir(self.root_dir)  # list the samples
         self.return_mask = return_mask
         self.transform = (
             transform  # transformations to apply to both inputs and targets
@@ -235,10 +247,23 @@ class SDTDataset(Dataset):
         #  transformations to apply just to inputs
         self.inp_transforms = transforms.Compose(
             [
+                transforms.Grayscale(),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),  # 0.5 = mean and 0.5 = variance
             ]
         )
+
+        self.loaded_imgs = [None] * len(self.samples)
+        self.loaded_masks = [None] * len(self.samples)
+        for sample_ind in range(len(self.samples)):
+            img_path = os.path.join(self.root_dir, self.samples[sample_ind], "image.tif")
+            image = Image.open(img_path)
+            image.load()
+            self.loaded_imgs[sample_ind] = self.inp_transforms(image)
+            mask_path = os.path.join(self.root_dir, self.samples[sample_ind], "mask.tif")
+            mask = Image.open(mask_path)
+            mask.load()
+            self.loaded_masks[sample_ind] = transforms.ToTensor()(mask)
 
     # get the total number of samples
     def __len__(self):
@@ -284,7 +309,6 @@ class SDTDataset(Dataset):
 # %%
 train_data = SDTDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
-
 
 show_random_dataset_image(train_data)
 
@@ -624,20 +648,32 @@ class AffinityDataset(Dataset):
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
         self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
-        self.samples = os.listdir(root_dir)  # list the samples
+        self.samples = os.listdir(self.root_dir)  # list the samples
         self.return_mask = return_mask
         self.transform = (
             transform  # transformations to apply to both inputs and targets
         )
         self.img_transform = img_transform  # transformations to apply to raw image only
         #  transformations to apply just to inputs
-        self.inp_transforms = transforms.Compose(
+        inp_transforms = transforms.Compose(
             [
                 transforms.Grayscale(),  # some of the images are RGB
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),  # 0.5 = mean and 0.5 = variance
             ]
         )
+
+        self.loaded_imgs = [None] * len(self.samples)
+        self.loaded_masks = [None] * len(self.samples)
+        for sample_ind in range(len(self.samples)):
+            img_path = os.path.join(self.root_dir, self.samples[sample_ind], "image.tif")
+            image = Image.open(img_path)
+            image.load()
+            self.loaded_imgs[sample_ind] = inp_transforms(image)
+            mask_path = os.path.join(self.root_dir, self.samples[sample_ind], "mask.tif")
+            mask = Image.open(mask_path)
+            mask.load()
+            self.loaded_masks[sample_ind] = transforms.ToTensor()(mask)
 
     # get the total number of samples
     def __len__(self):
@@ -757,12 +793,10 @@ val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
 unet.eval()
 
 (
-    ap_list,
     precision_list,
     recall_list,
     accuracy_list,
 ) = (
-    [],
     [],
     [],
     [],
@@ -784,13 +818,11 @@ for idx, (image, mask, sdt) in enumerate(tqdm(val_dataloader)):
     pred_labels = watershed_from_boundary_distance(
         pred, inner_mask, id_offset=0, min_seed_distance=20
     )
-    ap, precision, recall, accuracy = evaluate(gt_labels, pred_labels)
-    ap_list.append(ap)
+    precision, recall, accuracy = evaluate(gt_labels, pred_labels)
     precision_list.append(precision)
     recall_list.append(recall)
     accuracy_list.append(accuracy)
 
-print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
 print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
@@ -822,7 +854,7 @@ from cellpose import models
 
 
 # evaluation
-ap_list, precision_list, recall_list = [], [], []
+ap_list, precision_list, recall_list, accuracy_list = [], [], [], []
 for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
     gt_labels = np.squeeze(mask.cpu().numpy())
     image = np.squeeze(image.cpu().numpy())
@@ -830,14 +862,14 @@ for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
     # evaluate the model to get predictions
     pred_labels = ...
 
-    ap, precision, recall = evaluate(gt_labels, pred_labels[0])
-    ap_list.append(ap)
+    precision, recall, accuracy = evaluate(gt_labels, pred_labels[0])
     precision_list.append(precision)
     recall_list.append(recall)
+    accuracy_list.append(accuracy)
 
-print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
+print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 # %% tags=["solution"]
 # pip install cellpose
 
