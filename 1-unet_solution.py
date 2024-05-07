@@ -137,7 +137,7 @@ sample_2d_input
 # <div class="alert alert-block alert-info">
 #     <h4>Task 2A: Try out max pooling</h4>
 #         <p>Using the docs for <a href=https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html>torch.nn.MaxPool2d</a>,
-#         try initializing the module and applying it to the sample input. Try varying the stride and the padding, to see how the output changes.
+#         try initializing the module and applying it to the sample input. Try varying the parameters to see how the output changes.
 #         </p>
 
 # %% tags=[]
