@@ -59,7 +59,7 @@ from unet import UNet
 # %%
 
 train_data = NucleiDataset("nuclei_train_data", transforms_v2.RandomCrop(256))
-train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
+train_loader = DataLoader(train_data, batch_size=5, shuffle=True, num_workers=8)
 val_data = NucleiDataset("nuclei_val_data", transforms_v2.RandomCrop(256))
 val_loader = DataLoader(val_data, batch_size=5)
 
@@ -475,7 +475,7 @@ augmented_data = NucleiDataset(
 unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2).to(device)
 loss = nn.MSELoss()
 optimizer = torch.optim.Adam(unet.parameters())
-augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True)
+augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True, num_workers=8)
 
 ...
 
@@ -484,7 +484,7 @@ augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True)
 unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2).to(device)
 loss = nn.MSELoss()
 optimizer = torch.optim.Adam(unet.parameters())
-augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True)
+augmented_loader = DataLoader(augmented_data, batch_size=5, shuffle=True, num_workers=8)
 
 for epoch in range(10):
     train(unet, augmented_loader, optimizer, loss, epoch, device=device)
