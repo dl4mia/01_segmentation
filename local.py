@@ -398,8 +398,9 @@ def evaluate(gt_labels: np.ndarray, pred_labels: np.ndarray, th: float = 0.5):
     ap = tp / max(1, tp + fn + fp)
     precision = tp / max(1, tp + fp)
     recall = tp / max(1, tp + fn)
+    accuracy = tp / num_gt_labels
 
-    return ap, precision, recall
+    return ap, precision, recall, accuracy
 
 
 def plot_img_and_inter(img, sdt, label):
@@ -411,6 +412,7 @@ def plot_img_and_inter(img, sdt, label):
     ax2 = fig.add_subplot(spec[0, 1])
     ax2.set_xlabel(label, fontsize=20)
     plt.imshow(sdt, cmap="magma")
+    cbar = fig.colorbar(t, fraction=0.046, pad=0.04)
     _ = [ax.set_xticks([]) for ax in [ax1, ax2]]
     _ = [ax.set_yticks([]) for ax in [ax1, ax2]]
     plt.tight_layout()
@@ -469,7 +471,7 @@ def test_maximum(find_local_maxima):
     locs_x = np.random.randint(0,28,size=(3))
     locs_y = np.random.randint(0,28,size=(3))
     true_array[locs_x,locs_y] = 1
-    test_array = find_local_maxima(true_array, 3) > 1
+    test_array = find_local_maxima(true_array, 3)[0] > 1
 
     fig = plt.figure(constrained_layout=False, figsize=(10, 3))
     spec = gridspec.GridSpec(ncols=2, nrows=1, figure=fig)

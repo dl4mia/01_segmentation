@@ -16,9 +16,12 @@
 #
 # This means that the model will not be able to learn, if tasked to predict the labels directly.
 #
-# Therefore we split the task of instance segmentation in two and introduce an intermediate which must be:
+# Therefore we split the task of instance segmentation in two and introduce an intermediate target which must be:
 #   1) learnable
 #   2) post-processable into an instance segmentation
+# 
+# In this exercise we will go over two common intermediate targets (signed distance transform and affinities),
+# as well as the necessary post-processing for obtaining the final segmentations.
 
 # %% [markdown]
 # ## Import Packages
@@ -59,7 +62,7 @@ label_cmap = ListedColormap(np.load("cmap_60.npy"))
 # First we will use the signed distance transform as an intermediate learning objective
 #
 # <i>What is the signed distance transform?</i>
-# <br>  - Signed Distance Transform indicates the distance to the boundary of objects.
+# <br>  - Signed Distance Transform indicates the distance from each specific pixel to the boundary of objects.
 # <br>  - It is positive for pixels inside objects and negative for pixels outside objects (i.e. in the background).
 # <br>  - Remember that deep learning models work best with normalized values, therefore it is important the scale the distance
 #            transform. For simplicity things are often scaled between -1 and 1.
@@ -79,10 +82,10 @@ label_cmap = ListedColormap(np.load("cmap_60.npy"))
 from scipy.ndimage import distance_transform_edt
 
 
-def compute_sdt(labels: np.ndarray, scale: int = 5):
+def compute_sdt(labels: np.ndarray, scale: int):
     """Function to compute a signed distance transform."""
     labels = np.asarray(labels)
-    # compute the distance transform inside and outside of the objects
+    # compute the distance transform inside of each individual object and the background
 
     # create the signed distance transform
 
@@ -122,6 +125,7 @@ def compute_sdt(labels: np.ndarray, scale: int = 5):
 
 # %% [markdown]
 # Below is a small function to visualize the signed distance transform (SDT). <br> Use it to validate your function.
+# <br> Note that the output of the signed distance transform is not binary, a significant difference from semantic segmentation
 # %%
 # Visualize the signed distance transform using the function you wrote above.
 
@@ -135,9 +139,7 @@ plot_img_and_inter(img, sdt, label="SDT")
 
 # %% tags [markdown]
 # <b>Questions</b>:
-# 1. Why do we need to normalize the distances between -1 and 1?
-#   -
-# 2. What is the effect of changing the scale value? What do you think is a good default value?
+# 1. What is the effect of changing the scale value? What do you think is a good default value?
 #   -
 
 # %% [markdown] tags=["solution"]
@@ -151,7 +153,7 @@ plot_img_and_inter(img, sdt, label="SDT")
 # <div class="alert alert-block alert-info">
 # <b>Task 1.2</b>: <br>
 #     Modify the `SDTDataset` class below to produce the paired raw and SDT images.<br>
-#   1. Use the `compute_sdt` function to fill in the `create_sdt_target` method.<br>
+#   1. Use the `compute_sdt` function we just wrote to fill in the `create_sdt_target` method below.<br>
 #   2. Modify the `__get_item__` method to return an SDT output rather than a label mask.<br>
 #       - Ensure that all final outputs are of torch tensor type.<br>
 #       - Think about the order in which transformations are applied to the mask/SDT.<br>
@@ -185,7 +187,7 @@ class SDTDataset(Dataset):
     # fetch the training sample given its index
     def __getitem__(self, idx):
 
-        # Modify this function to return an image and sdt pair
+        #  TODO: Modify this function to return an image and sdt pair
 
         img_path = os.path.join(self.root_dir, self.samples[idx], "image.tif")
         # we'll be using the Pillow library for reading files
@@ -205,8 +207,10 @@ class SDTDataset(Dataset):
         if self.img_transform is not None:
             image = self.img_transform(image)
         if self.return_mask is True:
-            return image, transforms.ToTensor()(mask), sdt_mask
+            # want to be able to compare to true label for validation
+            return image, transforms.ToTensor()(mask), sdt
         else:
+            # only need the image and sdt for training
             return image, sdt
 
     def create_sdt_target(self):
@@ -257,13 +261,13 @@ class SDTDataset(Dataset):
             image = self.transform(image)
             torch.manual_seed(seed)
             mask = self.transform(mask)
-        sdt_mask = self.create_sdt_target(mask)
+        sdt = self.create_sdt_target(mask)
         if self.img_transform is not None:
             image = self.img_transform(image)
         if self.return_mask is True:
-            return image, transforms.ToTensor()(mask), sdt_mask
+            return image, transforms.ToTensor()(mask), sdt
         else:
-            return image, sdt_mask
+            return image, sdt
 
     def create_sdt_target(self, mask):
 
@@ -276,7 +280,7 @@ class SDTDataset(Dataset):
 # ### Test your function
 #
 # Next, we will create a training dataset and data loader.
-# We will use `show_random_dataset_image` (imported in the first cell) to verify that our dataset solution is correct. The output would show 2 images: the raw image and the corresponding SDT.
+# We will use `show_random_dataset_image` (imported in the first cell) to verify that our dataset solution is correct. The output should show 2 images: the raw image and the corresponding SDT.
 # %%
 train_data = SDTDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
@@ -289,7 +293,8 @@ show_random_dataset_image(train_data)
 # <b>Task 1.3</b>: Train the U-Net.
 # </div>
 # %% [markdown]
-# In this task, initialize the UNet.<br>
+# In this task, initialize the UNet, specify a loss function, learning rate, and optimizer, and train the model<br>
+# <br> For simplicity we will use a pre-made training function imported from `local` <br>
 # <u>Hints</u>:<br>
 #   - Loss function - [torch losses](https://pytorch.org/docs/stable/nn.html#loss-functions)
 #   - Optimizer - [torch optimizers](https://pytorch.org/docs/stable/optim.html)
@@ -316,8 +321,8 @@ unet = UNet(
 learning_rate=1e-4
 # Choose an optimizer
 
-# use the train function provided in local to train the model for 10 epochs
-for epoch in range(10):
+# use the train function provided in local to train the model for 20 epochs
+for epoch in range(20):
     train(
         model=...
         loader=...
@@ -382,9 +387,9 @@ plot_three(image, sdt, pred)
 # <hr style="height:2px;">
 #
 # ## Section 2: Post-Processing
-# - See here for a nice overview: [open-cv-image watershed](https://docs.opencv.org/4.x/d3/db4/tutorial_py_watershed.html), although the specifics of our code will be different
+# - See here for a nice overview: [open-cv-image watershed](https://docs.opencv.org/4.x/d3/db4/tutorial_py_watershed.html), although the specifics of our code will be slightly different
 # - Given the distance transform (the output of our model), we first need to find the local maxima that will be used as seed points
-# - The watershed algorithm then expands each seed out in a local "basin" until the segments touch.
+# - The watershed algorithm then expands each seed out in a local "basin" until the segments touch or the boundary of the object is hit.
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
@@ -398,7 +403,7 @@ plot_three(image, sdt, pred)
 from scipy.ndimage import label, maximum_filter
 
 
-def find_local_maxima(distance_transform, min_seed_distance):
+def find_local_maxima(distance_transform, min_dist_between_points):
 
     # Use `maximum_filter` to perform a maximum filter convolution on the distance_transform
 
@@ -409,11 +414,11 @@ def find_local_maxima(distance_transform, min_seed_distance):
 
 
 # %% tags=["solution"]
+from scipy.ndimage import label, maximum_filter
 
-
-def find_local_maxima(distance_transform, min_seed_distance):
+def find_local_maxima(distance_transform, min_dist_between_points):
     # Use `maximum_filter` to perform a maximum filter convolution on the distance_transform
-    max_filtered = maximum_filter(distance_transform, min_seed_distance)
+    max_filtered = maximum_filter(distance_transform, min_dist_between_points)
     maxima = max_filtered == distance_transform
     # Uniquely label the local maxima
     seeds, n = label(maxima)
@@ -472,7 +477,7 @@ image, mask = val_data[idx]  # get the image and the nuclei masks
 # Hint: make sure set the model to evaluation
 # Hint: check the dims of the image, remember they should be [batch, channels, x, y]
 # Hint: remember to move model outputs to the cpu and check their dimensions (as you did in task 1.3 visualization)
-
+pred = ...
 
 # Choose a threshold value to use to get the boundary mask
 thresh = ...
@@ -537,8 +542,8 @@ plot_four(image, mask, pred, seg, label="Target", cmap=label_cmap)
 # </div>
 # %% [markdown]
 # Which of the following should we use for our dataset?:
-#   1) [Dice](https://metrics-reloaded.dkfz.de/metric?id=dsc)
-#   2) [Average Precision](https://metrics-reloaded.dkfz.de/metric?id=average_precision)
+#   1) [IOU](https://metrics-reloaded.dkfz.de/metric?id=intersection_over_union)
+#   2) [accuracy](https://metrics-reloaded.dkfz.de/metric?id=accuracy)
 #   3) [Sensitivity](https://metrics-reloaded.dkfz.de/metric?id=sensitivity) and [Specificity](https://metrics-reloaded.dkfz.de/metric?id=specificity@target_value)
 #
 
@@ -558,7 +563,9 @@ unet.eval()
     ap_list,
     precision_list,
     recall_list,
+    accuracy_list,
 ) = (
+    [],
     [],
     [],
     [],
@@ -580,14 +587,16 @@ for idx, (image, mask, sdt) in enumerate(tqdm(val_dataloader)):
     pred_labels = watershed_from_boundary_distance(
         pred, inner_mask, id_offset=0, min_seed_distance=20
     )
-    ap, precision, recall = evaluate(gt_labels, pred_labels)
+    ap, precision, recall, accuracy = evaluate(gt_labels, pred_labels)
     ap_list.append(ap)
     precision_list.append(precision)
     recall_list.append(recall)
+    accuracy_list.append(accuracy)
 
 print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
+print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 # %% [markdown]
 # <hr style="height:2px;">
 #
@@ -609,7 +618,6 @@ print(f"Mean Recall is {np.mean(recall_list):.3f}")
 # %%
 # create a new dataset for affinities
 from local import compute_affinities
-
 
 class AffinityDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
@@ -752,12 +760,14 @@ unet.eval()
     ap_list,
     precision_list,
     recall_list,
+    accuracy_list,
 ) = (
     [],
     [],
     [],
+    [],
 )
-for idx, (image, mask, sdt) in enumerate(tqdm(val_loader)):
+for idx, (image, mask, sdt) in enumerate(tqdm(val_dataloader)):
     image = image.to(device)
     pred = unet(image)
 
@@ -767,21 +777,30 @@ for idx, (image, mask, sdt) in enumerate(tqdm(val_loader)):
 
     # feel free to try different thresholds
     thresh = threshold_otsu(pred)
-    inner_mask = 0.5 * (pred[0] + pred[1]) > thresh
-    boundary_distances = distance_transform_edt(inner_mask)
+
+    # get boundary mask
+    inner_mask = get_inner_mask(pred, threshold=thresh)
 
     pred_labels = watershed_from_boundary_distance(
-        boundary_distances, inner_mask, min_seed_distance=20
+        pred, inner_mask, id_offset=0, min_seed_distance=20
     )
-    ap, precision, recall = evaluate(gt_labels, pred_labels)
+    ap, precision, recall, accuracy = evaluate(gt_labels, pred_labels)
     ap_list.append(ap)
     precision_list.append(precision)
     recall_list.append(recall)
+    accuracy_list.append(accuracy)
 
 print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
+print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 
+# %% [markdown]
+# <hr style="height:2px;">
+#
+# ## Bonus: Further reading on Affinities
+# [Here](https://localshapedescriptors.github.io/) is a blog post describing the Local Shape Descriptor method of instance segmentation. 
+# 
 # %% [markdown]
 # <hr style="height:2px;">
 #
