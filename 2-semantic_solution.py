@@ -393,7 +393,7 @@ def validate(
 
 validate(
     unet,
-    train_loader,
+    val_loader,
     loss_function=torch.nn.MSELoss(),
     metric=DiceCoefficient(),
     step=0,
