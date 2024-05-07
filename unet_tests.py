@@ -57,7 +57,7 @@ class TestConvBlock:
         tensor_out = conv(tensor_in)
         
         shape_expected  = [out_channels, ] + shape
-        msg = "Output shame for same padding is incorrect."
+        msg = "Output shape for same padding is incorrect."
         assert tensor_out.shape == torch.Size(shape_expected), msg
     
     def test_relu(self):

@@ -88,7 +88,7 @@ sample_2d_input.shape, sample_2d_input
 #     <h4>Task 1: Try out different upsampling techniques</h4>
 #     <p>For our U-net, we will use the built-in PyTorch Upsample Module. Here we will practice declaring and calling an Upsample module with different parameters.</p>
 #     <ol>
-#         <li>Declare an instance of the pytorch Upsample module with scale_factor 2 and mode <code>"nearest"</code>. the Modules you want to use (in this case, <code>torch.nn.Upsample</code> with the correct arguments) in the <code>__init__</code> function.</li>
+#         <li>Declare an instance of the pytorch Upsample module with <code>scale_factor</code> 2 and mode <code>"nearest"</code>. the Modules you want to use (in this case, <code>torch.nn.Upsample</code> with the correct arguments) in the <code>__init__</code> function.</li>
 #         <li>Call the instance of Upsample on the <code>sample_2d_input</code> to see what the nearest mode does.</li> 
 #         <li>Vary the scale factor and mode to see what changes. Check the documentation for possible modes and required input dimensions.</li>
 #     </ol>
@@ -150,9 +150,9 @@ max_pool(sample_2d_input)
 # %% [markdown] tags=[]
 # <div class="alert alert-block alert-info">
 #     <h4>Task 2B: Implement a Downsample Module</h4>
-#     <p>This is very similar to the built in MaxPool2D, but additionally has to check if the downsample factor matches in the input size. Note that we provide the forward function for you - in future Modules, you will implement the forward yourself.</p>
+#     <p>This is very similar to the built in MaxPool2d, but additionally has to check if the downsample factor matches in the input size. Note that we provide the forward function for you - in future Modules, you will implement the forward yourself.</p>
 #     <ol>
-#         <li>Declare the submodules you want to use (in this case, <code>torch.nn.MaxPool2D</code> with the correct arguments) in the <code>__init__</code> function. In our Downsample Module, we do not want to allow padding or strides other than the input kernel size.</li>
+#         <li>Declare the submodules you want to use (in this case, <code>torch.nn.MaxPool2d</code> with the correct arguments) in the <code>__init__</code> function. In our Downsample Module, we do not want to use padding and the stride should match the input kernel size.</li>
 #         <li>Write a function to check if the downsample factor is valid. If the downsample factor does not evenly divide the dimensions of the input to the layer, this function should return False.</li>
 #     </ol>
 # </div>
@@ -160,7 +160,7 @@ max_pool(sample_2d_input)
 # %% tags=[]
 class Downsample(torch.nn.Module):
     def __init__(self, downsample_factor: int):
-        """Initialize a MaxPool2D module with the input downsample fator"""
+        """Initialize a MaxPool2d module with the input downsample fator"""
 
         super().__init__()
 
@@ -188,7 +188,7 @@ class Downsample(torch.nn.Module):
 # %% tags=["solution"]
 class Downsample(torch.nn.Module):
     def __init__(self, downsample_factor: int):
-        """Initialize a MaxPool2D module with the input downsample fator"""
+        """Initialize a MaxPool2d module with the input downsample fator"""
 
         super().__init__()
 
@@ -260,8 +260,8 @@ unet_tests.TestDown(Downsample).run()
 #     <p>The convolution block (ConvBlock) of a standard U-Net has two 3x3 convolutions, each of which is followed by a ReLU activation. Our implementation will handle other sizes of convolutions as well. The first convolution in the block will handle changing the input number of feature maps/channels into the output, and the second convolution will have the same number of feature maps in and out.</p>
 #     <ol>
 #         <li>Calculate the amount of padding required for same and valid convolutions</li>
-#         <li>Declare the submodules you want to use in the <code>__init__</code> function. Because you will always be calling four submodules in sequence (<a href=https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html#torch.nn.Conv2d>torch.nn.Conv2D</a>, <a href=https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU>torch.nn.ReLU</a>, Conv2D, ReLU), you can use <a href=https://pytorch.org/docs/stable/generated/torch.nn.Sequential.html>torch.nn.Sequential</a> to hold the convolutions and ReLUs.</li>
-#         <li>Call the modules in the forward function. If you used <code>torch.nn.Sequential</code> in step 1, you only need to call the Sequential module, but if not, you can call the Conv2D and ReLU Modules explicitly.</li>
+#         <li>Declare the submodules you want to use in the <code>__init__</code> function. Because you will always be calling four submodules in sequence (<a href=https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html#torch.nn.Conv2d>torch.nn.Conv2d</a>, <a href=https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU>torch.nn.ReLU</a>, Conv2d, ReLU), you can use <a href=https://pytorch.org/docs/stable/generated/torch.nn.Sequential.html>torch.nn.Sequential</a> to hold the convolutions and ReLUs.</li>
+#         <li>Call the modules in the forward function. If you used <code>torch.nn.Sequential</code> in step 1, you only need to call the Sequential module, but if not, you can call the Conv2d and ReLU Modules explicitly.</li>
 #     </ol>
 # </div>
 #
@@ -400,6 +400,9 @@ apply_and_show_random_image(conv)
 #     <h4>Task 4: Implement a CropAndConcat module</h4>
 #     <p>Below, you must implement the <code>forward</code> method, including the cropping (using the provided helper function <code>self.crop</code>) and the concatenation (using <a href=https://pytorch.org/docs/stable/generated/torch.cat.html#torch.cat>torch.cat</a>).
 # </p>
+# Hint: Use the <code>dim</code> keyword argument of <a href=https://pytorch.org/docs/stable/generated/torch.cat.html#torch.cat>torch.cat</a> to choose along which axis to concatenate the tensors.
+#</p>
+# Hint: The tensors have the layout (batch, channel, x, y)
 # </div>
 
 # %% tags=[]
@@ -832,7 +835,7 @@ class UNet(torch.nn.Module):
             the first downsampled layer, and level=depth - 1 is the bottom layer.
 
         Output (tuple[int, int]): The number of input and output feature maps
-            of the encoder convolutional pass in the given level.
+            of the decoder convolutional pass in the given level.
         """
         # SOLUTION 6.1B: Implement this function
         fmaps_out = self.num_fmaps * self.fmap_inc_factor ** (level)  
@@ -926,7 +929,7 @@ if isinstance(new_net, UNet):
 # Questions to consider:
 # <ol>
 #     <li>Which feature of the U-Net has most effect on the receptive field?</li>
-#     <li>TODO</li>
+#     <li>For each hyperparameter: Can you think of scenarios in which you would consider changing this parameter? Why? </li>
 # </ol>
 #
 # </div>
