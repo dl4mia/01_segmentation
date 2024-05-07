@@ -273,6 +273,12 @@ def validate(
             x, y = x.to(device), y.to(device)
             # TODO: evaluate this example with the given loss and metric
             prediction = ...
+            # We *usually* want the target to be the same type as the prediction
+            # however this is very dependent on your choice of loss function and
+            # metric. If you get errors such as "RuntimeError: Found dtype Float but expected Short"
+            # then this is where you should look.
+            if y.dtype != prediction.dtype:
+                y = y.type(prediction.dtype)
             val_loss += ...
             val_metric += ...
 
@@ -336,6 +342,12 @@ def validate(
         for x, y in loader:
             x, y = x.to(device), y.to(device)
             prediction = model(x)
+            # We *usually* want the target to be the same type as the prediction
+            # however this is very dependent on your choice of loss function and
+            # metric. If you get errors such as "RuntimeError: Found dtype Float but expected Short"
+            # then this is where you should look.
+            if y.dtype != prediction.dtype:
+                y = y.type(prediction.dtype)
             val_loss += loss_function(prediction, y).item()
             val_metric += metric(prediction > 0.5, y).item()
 
