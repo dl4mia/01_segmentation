@@ -19,7 +19,7 @@
 # Therefore we split the task of instance segmentation in two and introduce an intermediate target which must be:
 #   1) learnable
 #   2) post-processable into an instance segmentation
-# 
+#
 # In this exercise we will go over two common intermediate targets (signed distance transform and affinities),
 # as well as the necessary post-processing for obtaining the final segmentations.
 
@@ -35,11 +35,11 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from torchvision import transforms
 from scipy.ndimage import distance_transform_edt
-from local import train, NucleiDataset, plot_img_and_inter, plot_three, plot_four
+from local import train, NucleiDataset, plot_two, plot_three, plot_four
 from unet import UNet
-from local import show_random_dataset_image
 from tqdm import tqdm
-import urllib.request
+import tifffile
+
 from skimage.filters import threshold_otsu
 
 
@@ -49,12 +49,8 @@ device = "cuda"  # 'cuda', 'cpu', 'mps'
 assert torch.cuda.is_available()
 
 # %%
-# Download a custom label color map
-urllib.request.urlretrieve(
-    "https://tinyurl.com/labelcmap",
-    "cmap_60.npy",
-)
-label_cmap = ListedColormap(np.load("cmap_60.npy"))
+# Fetch a custom label color map for showing instances
+label_cmap = ListedColormap(np.load("/group/dl4miacourse/segmentation/cmap_60.npy"))
 
 # %% [markdown]
 # ## Section 1: Signed Distance Transform (SDT)
@@ -128,19 +124,22 @@ def compute_sdt(labels: np.ndarray, scale: int = 5):
 # <br> Note that the output of the signed distance transform is not binary, a significant difference from semantic segmentation
 # %%
 # Visualize the signed distance transform using the function you wrote above.
-
-train_data = NucleiDataset("nuclei_train_data", transforms.RandomCrop(256))
-idx = np.random.randint(len(train_data))  # take a random sample
-img, mask = train_data[idx]  # get the image and the nuclei masks
-
-sdt = compute_sdt(mask[0])
-plot_img_and_inter(img, sdt, label="SDT")
+root_dir = "/group/dl4miacourse/segmentation/nuclei_train_data"  # the directory with all the training samples
+samples = os.listdir(root_dir) 
+idx = np.random.randint(len(samples))  # take a random sample.
+img = tifffile.imread(os.path.join(root_dir, samples[idx], 'image.tif'))  # get the image 
+label = tifffile.imread(os.path.join(root_dir, samples[idx], 'label.tif'))  # get the image 
+sdt = compute_sdt(label)
+plot_two(img, sdt, label="SDT")
 
 
 # %% tags [markdown]
 # <b>Questions</b>:
-# 1. What is the effect of changing the scale value? What do you think is a good default value?
-#   -
+# 1. _Why do we need to normalize the distances between -1 and 1_?
+#      
+#
+# 2. _What is the effect of changing the scale value? What do you think is a good default value_?
+#   
 
 # %% [markdown] tags=["solution"]
 # <b>Questions</b>:
@@ -153,7 +152,7 @@ plot_img_and_inter(img, sdt, label="SDT")
 # <div class="alert alert-block alert-info">
 # <b>Task 1.2</b>: <br>
 #     Modify the `SDTDataset` class below to produce the paired raw and SDT images.<br>
-#   1. Use the `compute_sdt` function we just wrote to fill in the `create_sdt_target` method below.<br>
+#   1. Use the `compute_sdt` function we just wrote above, to fill in the `create_sdt_target` method below.<br>
 #   2. Modify the `__get_item__` method to return an SDT output rather than a label mask.<br>
 #       - Ensure that all final outputs are of torch tensor type.<br>
 #       - Think about the order in which transformations are applied to the mask/SDT.<br>
@@ -162,7 +161,7 @@ plot_img_and_inter(img, sdt, label="SDT")
 
 # %%
 class SDTDataset(Dataset):
-    """A PyTorch dataset to load cell images and nuclei masks"""
+    """A PyTorch dataset to load cell images and nuclei masks."""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
         self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
@@ -181,17 +180,7 @@ class SDTDataset(Dataset):
             ]
         )
 
-        self.loaded_imgs = [None] * len(self.samples)
-        self.loaded_masks = [None] * len(self.samples)
-        for sample_ind in range(len(self.samples)):
-            img_path = os.path.join(self.root_dir, self.samples[sample_ind], "image.tif")
-            image = Image.open(img_path)
-            image.load()
-            self.loaded_imgs[sample_ind] = inp_transforms(image)
-            mask_path = os.path.join(self.root_dir, self.samples[sample_ind], "mask.tif")
-            mask = Image.open(mask_path)
-            mask.load()
-            self.loaded_masks[sample_ind] = transforms.ToTensor()(mask)
+        
     # get the total number of samples
     def __len__(self):
         return len(self.samples)
@@ -234,7 +223,7 @@ class SDTDataset(Dataset):
 
 # %% tags=["solution"]
 class SDTDataset(Dataset):
-    """A PyTorch dataset to load cell images and nuclei masks"""
+    """A PyTorch dataset to load cell images and nuclei masks."""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
         self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
@@ -253,17 +242,7 @@ class SDTDataset(Dataset):
             ]
         )
 
-        self.loaded_imgs = [None] * len(self.samples)
-        self.loaded_masks = [None] * len(self.samples)
-        for sample_ind in range(len(self.samples)):
-            img_path = os.path.join(self.root_dir, self.samples[sample_ind], "image.tif")
-            image = Image.open(img_path)
-            image.load()
-            self.loaded_imgs[sample_ind] = self.inp_transforms(image)
-            mask_path = os.path.join(self.root_dir, self.samples[sample_ind], "mask.tif")
-            mask = Image.open(mask_path)
-            mask.load()
-            self.loaded_masks[sample_ind] = transforms.ToTensor()(mask)
+        
 
     # get the total number of samples
     def __len__(self):
@@ -296,29 +275,30 @@ class SDTDataset(Dataset):
 
     def create_sdt_target(self, mask):
 
-        sdt_target_array = compute_sdt(mask, scale=2)
+        sdt_target_array = compute_sdt(mask)
         sdt_target = transforms.ToTensor()(sdt_target_array)
         return sdt_target.float()
-
 
 # %% [markdown]
 # ### Test your function
 #
 # Next, we will create a training dataset and data loader.
-# We will use `show_random_dataset_image` (imported in the first cell) to verify that our dataset solution is correct. The output should show 2 images: the raw image and the corresponding SDT.
+# We will use `plot_two` (imported in the first cell) to verify that our dataset solution is correct. The output should show 2 images: the raw image and the corresponding SDT.
 # %%
 train_data = SDTDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
 
-show_random_dataset_image(train_data)
+idx = np.random.randint(len(train_data))  # take a random sample
+img, sdt = train_data[idx]  # get the image and the nuclei masks
+plot_two(img[0], sdt[0], label="SDT")
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
 # <b>Task 1.3</b>: Train the U-Net.
 # </div>
 # %% [markdown]
-# In this task, initialize the UNet, specify a loss function, learning rate, and optimizer, and train the model<br>
-# <br> For simplicity we will use a pre-made training function imported from `local` <br>
+# In this task, initialize the UNet, specify a loss function, learning rate, and optimizer, and train the model.<br>
+# <br> For simplicity we will use a pre-made training function imported from `local.py`. <br>
 # <u>Hints</u>:<br>
 #   - Loss function - [torch losses](https://pytorch.org/docs/stable/nn.html#loss-functions)
 #   - Optimizer - [torch optimizers](https://pytorch.org/docs/stable/optim.html)
@@ -328,7 +308,7 @@ show_random_dataset_image(train_data)
 #       - [relu](https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU)
 
 # %%
-# Initialize the model
+# Initialize the model.
 unet = UNet(
     depth=...,
     in_channels=...,
@@ -340,12 +320,15 @@ unet = UNet(
     out_channels=...,
 )
 
-# Choose a loss function
-
 learning_rate=1e-4
-# Choose an optimizer
 
-# use the train function provided in local to train the model for 20 epochs
+# Choose a loss function.
+
+# Choose an optimizer.
+
+# Use the train function provided in local.py 
+# to train the model for 20 epochs.
+
 for epoch in range(20):
     train(
         model=...
@@ -369,12 +352,12 @@ unet = UNet(
     upsample_mode="nearest",
 )
 
-loss = torch.nn.MSELoss()
 learning_rate = 1e-4
+loss = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(unet.parameters(), lr=learning_rate)
 
 
-for epoch in range(10):
+for epoch in range(20):
     train(
         unet,
         train_loader,
@@ -386,13 +369,14 @@ for epoch in range(10):
     )
 
 # %% [markdown]
-# Next, let's run the inference using our trained model and visualize some random samples.
+# Now, let's apply our trained model and visualize some random samples. <br>
+# First, we create a validation dataset. <br> Next, we sample a random image from the dataset and input into the model.
 
 # %%
 val_data = SDTDataset("nuclei_val_data")
 unet.eval()
-idx = np.random.randint(len(val_data))  # take a random sample
-image, sdt = val_data[idx]  # get the image and the nuclei masks
+idx = np.random.randint(len(val_data))  # take a random sample.
+image, sdt = val_data[idx]  # get the image and the nuclei masks.
 image = image.to(device)
 pred = unet(torch.unsqueeze(image, dim=0))
 image = np.squeeze(image.cpu())
@@ -450,7 +434,7 @@ def find_local_maxima(distance_transform, min_dist_between_points):
     return seeds, n
 
 # %%
-# test your function
+# test your function.
 from local import test_maximum
 test_maximum(find_local_maxima)
 
@@ -458,7 +442,6 @@ test_maximum(find_local_maxima)
 # We now use this function to find the seeds for the watershed.
 # %%
 from skimage.segmentation import watershed
-
 
 def watershed_from_boundary_distance(
     boundary_distances: np.ndarray,
@@ -566,8 +549,8 @@ plot_four(image, mask, pred, seg, label="Target", cmap=label_cmap)
 # </div>
 # %% [markdown]
 # Which of the following should we use for our dataset?:
-#   1) [IOU](https://metrics-reloaded.dkfz.de/metric?id=intersection_over_union)
-#   2) [accuracy](https://metrics-reloaded.dkfz.de/metric?id=accuracy)
+#   1) [IoU](https://metrics-reloaded.dkfz.de/metric?id=intersection_over_union)
+#   2) [Accuracy](https://metrics-reloaded.dkfz.de/metric?id=accuracy)
 #   3) [Sensitivity](https://metrics-reloaded.dkfz.de/metric?id=sensitivity) and [Specificity](https://metrics-reloaded.dkfz.de/metric?id=specificity@target_value)
 #
 
@@ -584,12 +567,10 @@ val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False)
 unet.eval()
 
 (
-    ap_list,
     precision_list,
     recall_list,
     accuracy_list,
 ) = (
-    [],
     [],
     [],
     [],
@@ -611,13 +592,11 @@ for idx, (image, mask, sdt) in enumerate(tqdm(val_dataloader)):
     pred_labels = watershed_from_boundary_distance(
         pred, inner_mask, id_offset=0, min_seed_distance=20
     )
-    ap, precision, recall, accuracy = evaluate(gt_labels, pred_labels)
-    ap_list.append(ap)
+    precision, recall, accuracy = evaluate(gt_labels, pred_labels)
     precision_list.append(precision)
     recall_list.append(recall)
     accuracy_list.append(accuracy)
 
-print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
 print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
@@ -631,7 +610,7 @@ print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 # <br> Imagine there is an edge between two pixels if they are in the same class and no edge if not.
 # <br> If we then take all pixels that are directly and indirectly connected by edges, we get an instance.
 # <br> Essentially, we label edges between neighboring pixels as “connected” or “cut”, rather than labeling the pixels themselves. <br>
-# Here, below we show the affinity in x + affinity in y.
+# Here,  we show the (affinity in x + affinity in y) in the bottom right image.
 
 # %% [markdown]
 # ![image](static/05_instance_affinity.png)
@@ -655,25 +634,13 @@ class AffinityDataset(Dataset):
         )
         self.img_transform = img_transform  # transformations to apply to raw image only
         #  transformations to apply just to inputs
-        inp_transforms = transforms.Compose(
+        self.inp_transforms = transforms.Compose(
             [
                 transforms.Grayscale(),  # some of the images are RGB
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),  # 0.5 = mean and 0.5 = variance
             ]
         )
-
-        self.loaded_imgs = [None] * len(self.samples)
-        self.loaded_masks = [None] * len(self.samples)
-        for sample_ind in range(len(self.samples)):
-            img_path = os.path.join(self.root_dir, self.samples[sample_ind], "image.tif")
-            image = Image.open(img_path)
-            image.load()
-            self.loaded_imgs[sample_ind] = inp_transforms(image)
-            mask_path = os.path.join(self.root_dir, self.samples[sample_ind], "mask.tif")
-            mask = Image.open(mask_path)
-            mask.load()
-            self.loaded_masks[sample_ind] = transforms.ToTensor()(mask)
 
     # get the total number of samples
     def __len__(self):
@@ -717,7 +684,9 @@ class AffinityDataset(Dataset):
 
 train_data = AffinityDataset("nuclei_train_data", transforms.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
-show_random_dataset_image(train_data)
+idx = np.random.randint(len(train_data))  # take a random sample
+img, affinity = train_data[idx]  # get the image and the nuclei masks
+plot_two(img[0], affinity[0] + affinity[1], label="AFFINITY")
 
 # %% [markdown]
 # <div class="alert alert-block alert-info">
@@ -730,10 +699,21 @@ show_random_dataset_image(train_data)
 
 # %%
 # define the model
+unet = UNet(
+    depth= ...,
+    in_channels=...,
+    downsample_factor=...,
+    final_activation=...,  
+    out_channels=...,
+)
 
-# specify loss / optimizer
+learning_rate = 1e-4
+# specify loss 
 
-# training loop
+# specify optimizer
+
+# add training loop
+
 
 
 # %% tags=["solution"]
@@ -749,10 +729,11 @@ unet = UNet(
     out_channels=2,
 )
 
+learning_rate = 1e-4
+
 # choose a loss function
 loss = torch.nn.MSELoss()
 
-learning_rate = 1e-4
 optimizer = torch.optim.Adam(unet.parameters(), lr=learning_rate)
 
 for epoch in range(20):
@@ -801,22 +782,27 @@ unet.eval()
     [],
     [],
 )
-for idx, (image, mask, sdt) in enumerate(tqdm(val_dataloader)):
+for idx, (image, mask, _) in enumerate(tqdm(val_dataloader)):
     image = image.to(device)
+    
     pred = unet(image)
-
+    
     image = np.squeeze(image.cpu())
+    
     gt_labels = np.squeeze(mask.cpu().numpy())
+    
     pred = np.squeeze(pred.cpu().detach().numpy())
-
+    
     # feel free to try different thresholds
     thresh = threshold_otsu(pred)
-
+    
     # get boundary mask
-    inner_mask = get_inner_mask(pred, threshold=thresh)
-
+    inner_mask = 0.5 * (pred[0] + pred[1]) > thresh
+    
+    boundary_distances = distance_transform_edt(inner_mask)
+    
     pred_labels = watershed_from_boundary_distance(
-        pred, inner_mask, id_offset=0, min_seed_distance=20
+        boundary_distances, inner_mask, id_offset=0, min_seed_distance=20
     )
     precision, recall, accuracy = evaluate(gt_labels, pred_labels)
     precision_list.append(precision)
@@ -832,7 +818,7 @@ print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 #
 # ## Bonus: Further reading on Affinities
 # [Here](https://localshapedescriptors.github.io/) is a blog post describing the Local Shape Descriptor method of instance segmentation. 
-# 
+#
 # %% [markdown]
 # <hr style="height:2px;">
 #
@@ -843,18 +829,18 @@ print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 # <br> -[cellpose documentation](https://cellpose.readthedocs.io/en/latest/)
 #
 #
-#%%
-# install cellpose
-pip install cellpose
+# %%
+# Install cellpose.
+# !pip install cellpose
 
-#%%
+# %%
 from cellpose import models
 
-# implement a cellpose pretrained model
-
+# Implement a cellpose pretrained model.
+# TODO
 
 # evaluation
-ap_list, precision_list, recall_list, accuracy_list = [], [], [], []
+precision_list, recall_list, accuracy_list = [], [], []
 for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
     gt_labels = np.squeeze(mask.cpu().numpy())
     image = np.squeeze(image.cpu().numpy())
@@ -871,22 +857,24 @@ print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
 print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 # %% tags=["solution"]
-# pip install cellpose
+from cellpose import models
 
 model = models.Cellpose(model_type="nuclei")
 channels = [[0, 0]]
 
-ap_list, precision_list, recall_list = [], [], []
+precision_list, recall_list, accuracy_list = [], [], []
 for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
     gt_labels = np.squeeze(mask.cpu().numpy())
     image = np.squeeze(image.cpu().numpy())
     pred_labels, _, _, _ = model.eval([image], diameter=None, channels=channels)
 
-    ap, precision, recall = evaluate(gt_labels, pred_labels[0])
-    ap_list.append(ap)
+    precision, recall, accuracy = evaluate(gt_labels, pred_labels[0])
     precision_list.append(precision)
     recall_list.append(recall)
+    accuracy_list.append(accuracy)
 
-print(f"Mean Accuracy is {np.mean(ap_list):.3f}")
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
+print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
+
+# %%
