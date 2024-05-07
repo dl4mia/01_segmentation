@@ -411,8 +411,11 @@ def plot_img_and_inter(img, sdt, label):
     plt.imshow(img[0], cmap="magma")
     ax2 = fig.add_subplot(spec[0, 1])
     ax2.set_xlabel(label, fontsize=20)
-    plt.imshow(sdt, cmap="magma")
+    t=plt.imshow(sdt, cmap="magma")
     cbar = fig.colorbar(t, fraction=0.046, pad=0.04)
+    tick_locator = ticker.MaxNLocator(nbins=3)
+    cbar.locator = tick_locator
+    cbar.update_ticks()
     _ = [ax.set_xticks([]) for ax in [ax1, ax2]]
     _ = [ax.set_yticks([]) for ax in [ax1, ax2]]
     plt.tight_layout()
