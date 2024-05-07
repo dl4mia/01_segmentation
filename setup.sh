@@ -1,10 +1,19 @@
+#!/bin/bash
+
 # this seems necessary for the activate call to work
-eval "$(conda shell.bash hook)"
+source /localscratch/miniforge3/etc/profile.d/mamba.sh
+
 # Create environment name based on the exercise name
 mamba create -n segmentation python=3.10 -y
-mamba activate segmentation
-# Install additional requirements
-mamba install -c pytorch -c nvidia -c conda-forge --file requirements.txt -y
+conda activate segmentation
+if [[ "$CONDA_DEFAULT_ENV" == "segmentation" ]]; then
+    echo "Environment activated successfully"
+    # Install additional requirements
+    mamba install -c pytorch -c nvidia -c conda-forge --file requirements.txt -y
+else
+    echo "Failed to activate the environment"
+fi
+
 # Build the notebooks
 sh prepare-exercise.sh
 
