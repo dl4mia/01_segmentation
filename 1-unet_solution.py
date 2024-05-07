@@ -91,7 +91,7 @@ sample_2d_input.shape, sample_2d_input
 #     <h4>Task 1: Try out different upsampling techniques</h4>
 #     <p>For our U-net, we will use the built-in PyTorch Upsample Module. Here we will practice declaring and calling an Upsample module with different parameters.</p>
 #     <ol>
-#         <li>Declare an instance of the pytorch Upsample module with <code>scale_factor</code> 2 and mode <code>"nearest"</code>. the Modules you want to use (in this case, <code>torch.nn.Upsample</code> with the correct arguments) in the <code>__init__</code> function.</li>
+#         <li>Declare an instance of the pytorch Upsample module with <code>scale_factor</code> 2 and mode <code>"nearest"</code>.</li>
 #         <li>Call the instance of Upsample on the <code>sample_2d_input</code> to see what the nearest mode does.</li>
 #         <li>Vary the scale factor and mode to see what changes. Check the documentation for possible modes and required input dimensions.</li>
 #     </ol>
