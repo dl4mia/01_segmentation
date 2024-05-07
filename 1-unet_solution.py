@@ -120,7 +120,7 @@ up(sample_2d_input)
 # Here is an additional example on image data.
 
 # %% tags=[]
-apply_and_show_random_image(up)
+apply_and_show_random_image(up, dataset)
 
 # %% [markdown] tags=[]
 # ### Component 2: Downsampling
@@ -222,7 +222,7 @@ class Downsample(torch.nn.Module):
 
 # %% tags=[]
 down = Downsample(4)
-apply_and_show_random_image(down)
+apply_and_show_random_image(down, dataset)
 
 # %% [markdown] tags=[]
 # We wrote some rudimentary tests for each of the torch modules you are writing. If you get an error from your code or an AssertionError from the test, you should probably have another look ath your implementation.
@@ -383,7 +383,7 @@ unet_tests.TestConvBlock(ConvBlock).run()
 # %% tags=[]
 torch.manual_seed(26)
 conv = ConvBlock(1, 2, 5, "same")
-apply_and_show_random_image(conv)
+apply_and_show_random_image(conv, dataset)
 
 
 # %% [markdown] tags=[]
@@ -543,7 +543,7 @@ unet_tests.TestOutputConv(OutputConv).run()
 
 # %% tags=[]
 out_conv = OutputConv(in_channels=1, out_channels=1, activation="ReLU")
-apply_and_show_random_image(out_conv)
+apply_and_show_random_image(out_conv, dataset)
 
 # %% [markdown] tags=[]
 # <div class="alert alert-block alert-success">
@@ -876,7 +876,7 @@ unet_tests.TestUNet(UNet).run()
 simple_net = UNet(depth=2, in_channels=1)
 
 # %% tags=[]
-apply_and_show_random_image(simple_net)
+apply_and_show_random_image(simple_net, dataset)
 
 # %% [markdown] tags=[]
 # ### Receptive Field

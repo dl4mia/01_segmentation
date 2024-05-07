@@ -120,8 +120,7 @@ def show_random_augmentation_comparison(dataset_a, dataset_b):
     plt.show()
 
 
-def apply_and_show_random_image(f, path="nuclei_train_data"):
-    ds = NucleiDataset(path)
+def apply_and_show_random_image(f, ds):
 
     # pick random raw image from dataset
     img_tensor = ds[np.random.randint(len(ds))][0]
