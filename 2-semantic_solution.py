@@ -444,7 +444,7 @@ example_augmented_data = NucleiDataset(
     transforms_v2.Compose(
         [transforms_v2.RandomRotation(45), transforms_v2.RandomCrop(256)]
     ),
-    img_transform=transforms_v2.Compose([transforms_v2.GaussianBlur(5, sigma=10.0)]),
+    img_transform=transforms_v2.Compose([transforms_v2.GaussianBlur(21, sigma=10.0)]),
 )
 
 # %%
