@@ -10,7 +10,7 @@ source setup.sh
 
 When you are ready to start the exercise, make sure you are in your base environment and then run jupyter lab.
 ```bash
-mamba activate segmentations
+mamba activate segmentation
 jupyter lab
 ```
 
