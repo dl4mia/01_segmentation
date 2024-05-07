@@ -29,13 +29,25 @@ class NucleiDataset(Dataset):
         )
         self.img_transform = img_transform  # transformations to apply to raw image only
         #  transformations to apply just to inputs
-        self.inp_transforms = transforms.Compose(
+        inp_transforms = transforms.Compose(
             [
-                transforms.Grayscale(),  # some of the images are RGB
+                transforms.Grayscale(),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),  # 0.5 = mean and 0.5 = variance
             ]
         )
+
+        self.loaded_imgs = [None] * len(self.samples)
+        self.loaded_masks = [None] * len(self.samples)
+        for sample_ind in range(len(self.samples)):
+            img_path = os.path.join(self.root_dir, self.samples[sample_ind], "image.tif")
+            image = Image.open(img_path)
+            image.load()
+            self.loaded_imgs[sample_ind] = inp_transforms(image)
+            mask_path = os.path.join(self.root_dir, self.samples[sample_ind], "mask.tif")
+            mask = Image.open(mask_path)
+            mask.load()
+            self.loaded_masks[sample_ind] = transforms.ToTensor()(mask)
 
     # get the total number of samples
     def __len__(self):
@@ -43,13 +55,10 @@ class NucleiDataset(Dataset):
 
     # fetch the training sample given its index
     def __getitem__(self, idx):
-        img_path = os.path.join(self.root_dir, self.samples[idx], "image.tif")
         # we'll be using Pillow library for reading files
         # since many torchvision transforms operate on PIL images
-        image = Image.open(img_path)
-        image = self.inp_transforms(image)
-        mask_path = os.path.join(self.root_dir, self.samples[idx], "mask.tif")
-        mask = transforms.ToTensor()(Image.open(mask_path))
+        image = self.loaded_imgs[idx]
+        mask = self.loaded_masks[idx]
         if self.transform is not None:
             # Note: using seeds to ensure the same random transform is applied to
             # the image and mask
@@ -61,7 +70,6 @@ class NucleiDataset(Dataset):
         if self.img_transform is not None:
             image = self.img_transform(image)
         return image, mask
-
 
 def show_random_dataset_image(dataset):
     idx = np.random.randint(0, len(dataset))  # take a random sample
