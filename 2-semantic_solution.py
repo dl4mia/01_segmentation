@@ -487,7 +487,7 @@ show_random_augmentation_comparison(train_data, example_augmented_data)
 # <div class="alert alert-block alert-info">
 #     <b>Task 2.1</b>: Now create an augmented dataset with an augmentation of your choice.
 #       **hint**: Using the same augmentation as was applied to the validation data will
-#      likely be optimal.
+#      likely be optimal. Bonus points if you can get good results without the custom noise.
 # </div>
 
 # %%
