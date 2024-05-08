@@ -309,7 +309,7 @@ class SDTDataset(Dataset):
 # We will use `plot_two` (imported in the first cell) to verify that our dataset solution is correct. The output should show 2 images: the raw image and the corresponding SDT.
 # %%
 train_data = SDTDataset("nuclei_train_data", transforms.RandomCrop(256))
-train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
+train_loader = DataLoader(train_data, batch_size=5, shuffle=True, num_workers=8)
 
 idx = np.random.randint(len(train_data))  # take a random sample
 img, sdt = train_data[idx]  # get the image and the nuclei masks
@@ -354,22 +354,22 @@ learning_rate=1e-4
 
 for epoch in range(20):
     train(
-        model=...
-        loader=...
-        optimizer=...
-        loss_function=...
-        epoch=...
+        model=...,
+        loader=...,
+        optimizer=...,
+        loss_function=...,
+        epoch=...,
         log_interval=10,
         device=device,
     )
 
 # %% tags=["solution"]
 unet = UNet(
-    depth=2,
+    depth=4,
     in_channels=1,
     out_channels=1,
     final_activation="Tanh",
-    num_fmaps=64,
+    num_fmaps=16,
     fmap_inc_factor=3,
     downsample_factor=2,
     padding="same",
@@ -587,7 +587,7 @@ from local import evaluate
 
 # Need to re-initialize the dataloader to return masks in addition to SDTs.
 val_dataset = SDTDataset("nuclei_val_data", return_mask=True)
-val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False)
+val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
 unet.eval()
 
 (
@@ -680,7 +680,7 @@ class AffinityDataset(Dataset):
             )
             mask = Image.open(mask_path)
             mask.load()
-            self.loaded_masks[sample_ind] = transforms.ToTensor()(mask)
+            self.loaded_masks[sample_ind] = mask
 
     # get the total number of samples
     def __len__(self):
@@ -718,7 +718,7 @@ class AffinityDataset(Dataset):
 # Initialize the datasets
 
 train_data = AffinityDataset("nuclei_train_data", transforms.RandomCrop(256))
-train_loader = DataLoader(train_data, batch_size=5, shuffle=True)
+train_loader = DataLoader(train_data, batch_size=5, shuffle=True, num_workers=8)
 idx = np.random.randint(len(train_data))  # take a random sample
 img, affinity = train_data[idx]  # get the image and the nuclei masks
 plot_two(img[0], affinity[0] + affinity[1], label="AFFINITY")
@@ -753,9 +753,9 @@ learning_rate = 1e-4
 
 # %% tags=["solution"]
 unet = UNet(
-    depth=1,
+    depth=4,
     in_channels=1,
-    num_fmaps=64,
+    num_fmaps=16,
     fmap_inc_factor=3,
     downsample_factor=2,
     padding="same",
@@ -778,7 +778,7 @@ for epoch in range(20):
         optimizer,
         loss,
         epoch,
-        log_interval=10,
+        log_interval=100,
         device=device,
     )
 
@@ -787,7 +787,7 @@ for epoch in range(20):
 
 # %%
 val_data = AffinityDataset("nuclei_val_data", transforms.RandomCrop(256))
-val_loader = DataLoader(val_data, batch_size=1, shuffle=False)
+val_loader = DataLoader(val_data, batch_size=1, shuffle=False, num_workers=8)
 
 unet.eval()
 idx = np.random.randint(len(val_data))  # take a random sample
@@ -805,7 +805,7 @@ plot_three(image, mask[0] + mask[1], pred[0] + pred[1], label="Affinity")
 
 # %%
 val_dataset = AffinityDataset("nuclei_val_data", return_mask=True)
-val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
+val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=8)
 unet.eval()
 
 (
@@ -912,4 +912,3 @@ print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
 print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 
-# %%
