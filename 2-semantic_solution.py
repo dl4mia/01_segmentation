@@ -98,6 +98,7 @@ val_data = NucleiDataset(
 )
 val_loader = DataLoader(val_data, batch_size=5)
 
+# %%
 unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2).to(device)
 loss = nn.MSELoss()
 optimizer = torch.optim.Adam(unet.parameters())
