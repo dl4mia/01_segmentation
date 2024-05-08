@@ -84,8 +84,9 @@ def compute_sdt(labels: np.ndarray, scale: int):
     # compute the distance transform inside of each individual object and the background
 
     # create the signed distance transform
+    # remember that it should be positive inside the objects and negative outside
 
-    # scale the distances so that they are between -1 and 1 (hint: np.tanh)
+    # scale the distances with the scale parameter and then normalize so that they are between -1 and 1 (hint: np.tanh)
 
     # be sure to return your solution as type 'float'
     return
@@ -125,10 +126,14 @@ def compute_sdt(labels: np.ndarray, scale: int = 5):
 # %%
 # Visualize the signed distance transform using the function you wrote above.
 root_dir = "/group/dl4miacourse/segmentation/nuclei_train_data"  # the directory with all the training samples
-samples = os.listdir(root_dir) 
+samples = os.listdir(root_dir)
 idx = np.random.randint(len(samples))  # take a random sample.
-img = tifffile.imread(os.path.join(root_dir, samples[idx], 'image.tif'))  # get the image 
-label = tifffile.imread(os.path.join(root_dir, samples[idx], 'label.tif'))  # get the image 
+img = tifffile.imread(
+    os.path.join(root_dir, samples[idx], "image.tif")
+)  # get the image
+label = tifffile.imread(
+    os.path.join(root_dir, samples[idx], "label.tif")
+)  # get the image
 sdt = compute_sdt(label)
 plot_two(img, sdt, label="SDT")
 
@@ -136,10 +141,10 @@ plot_two(img, sdt, label="SDT")
 # %% tags [markdown]
 # <b>Questions</b>:
 # 1. _Why do we need to normalize the distances between -1 and 1_?
-#      
+#
 #
 # 2. _What is the effect of changing the scale value? What do you think is a good default value_?
-#   
+#
 
 # %% [markdown] tags=["solution"]
 # <b>Questions</b>:
@@ -164,7 +169,9 @@ class SDTDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks."""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
-        self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
+        self.root_dir = (
+            "/group/dl4miacourse/segmentation/" + root_dir
+        )  # the directory with all the training samples
         self.samples = os.listdir(self.root_dir)  # list the samples
         self.return_mask = return_mask
         self.transform = (
@@ -182,7 +189,7 @@ class SDTDataset(Dataset):
 
         self.loaded_imgs = [None] * len(self.samples)
         self.loaded_masks = [None] * len(self.samples)
-        for sample_ind in range(len(self.samples)):
+        for sample_ind in tqdm(range(len(self.samples))):
             img_path = os.path.join(
                 self.root_dir, self.samples[sample_ind], "image.tif"
             )
@@ -195,7 +202,7 @@ class SDTDataset(Dataset):
             mask = Image.open(mask_path)
             mask.load()
             self.loaded_masks[sample_ind] = mask
-        
+
     # get the total number of samples
     def __len__(self):
         return len(self.samples)
@@ -204,6 +211,7 @@ class SDTDataset(Dataset):
     def __getitem__(self, idx):
 
         #  TODO: Modify this function to return an image and sdt pair
+        # add a call to the create sdt_target function somewhere below ... where is the challenge
 
         # we'll be using the Pillow library for reading files
         # since many torchvision transforms operate on PIL images
@@ -226,9 +234,10 @@ class SDTDataset(Dataset):
             # only need the image and sdt for training
             return image, sdt
 
-    def create_sdt_target(self):
+    def create_sdt_target(self, mask):
         # TODO: Fill in function
         # make sure this function is returning a torch tensor
+        # chose a scale value to use here, it's fine to hard code it in
 
         return
 
@@ -238,7 +247,9 @@ class SDTDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks."""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
-        self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
+        self.root_dir = (
+            "/group/dl4miacourse/segmentation/" + root_dir
+        )  # the directory with all the training samples
         self.samples = os.listdir(self.root_dir)  # list the samples
         self.return_mask = return_mask
         self.transform = (
@@ -256,7 +267,7 @@ class SDTDataset(Dataset):
 
         self.loaded_imgs = [None] * len(self.samples)
         self.loaded_masks = [None] * len(self.samples)
-        for sample_ind in range(len(self.samples)):
+        for sample_ind in tqdm(range(len(self.samples))):
             img_path = os.path.join(
                 self.root_dir, self.samples[sample_ind], "image.tif"
             )
@@ -302,6 +313,7 @@ class SDTDataset(Dataset):
         sdt_target = transforms.ToTensor()(sdt_target_array)
         return sdt_target.float()
 
+
 # %% [markdown]
 # ### Test your function
 #
@@ -343,13 +355,13 @@ unet = UNet(
     out_channels=...,
 )
 
-learning_rate=1e-4
+learning_rate = 1e-4
 
 # Choose a loss function.
 
 # Choose an optimizer.
 
-# Use the train function provided in local.py 
+# Use the train function provided in local.py
 # to train the model for 20 epochs.
 
 for epoch in range(20):
@@ -448,6 +460,7 @@ def find_local_maxima(distance_transform, min_dist_between_points):
 # %% tags=["solution"]
 from scipy.ndimage import label, maximum_filter
 
+
 def find_local_maxima(distance_transform, min_dist_between_points):
     # Use `maximum_filter` to perform a maximum filter convolution on the distance_transform
     max_filtered = maximum_filter(distance_transform, min_dist_between_points)
@@ -457,15 +470,18 @@ def find_local_maxima(distance_transform, min_dist_between_points):
 
     return seeds, n
 
+
 # %%
 # test your function.
 from local import test_maximum
+
 test_maximum(find_local_maxima)
 
 # %% [markdown]
 # We now use this function to find the seeds for the watershed.
 # %%
 from skimage.segmentation import watershed
+
 
 def watershed_from_boundary_distance(
     boundary_distances: np.ndarray,
@@ -646,11 +662,14 @@ print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 # create a new dataset for affinities
 from local import compute_affinities
 
+
 class AffinityDataset(Dataset):
     """A PyTorch dataset to load cell images and nuclei masks"""
 
     def __init__(self, root_dir, transform=None, img_transform=None, return_mask=False):
-        self.root_dir = "/group/dl4miacourse/segmentation/" + root_dir  # the directory with all the training samples
+        self.root_dir = (
+            "/group/dl4miacourse/segmentation/" + root_dir
+        )  # the directory with all the training samples
         self.samples = os.listdir(self.root_dir)  # list the samples
         self.return_mask = return_mask
         self.transform = (
@@ -668,7 +687,7 @@ class AffinityDataset(Dataset):
 
         self.loaded_imgs = [None] * len(self.samples)
         self.loaded_masks = [None] * len(self.samples)
-        for sample_ind in range(len(self.samples)):
+        for sample_ind in tqdm(range(len(self.samples))):
             img_path = os.path.join(
                 self.root_dir, self.samples[sample_ind], "image.tif"
             )
@@ -735,20 +754,19 @@ plot_two(img[0], affinity[0] + affinity[1], label="AFFINITY")
 # %%
 # define the model
 unet = UNet(
-    depth= ...,
+    depth=...,
     in_channels=...,
     downsample_factor=...,
-    final_activation=...,  
+    final_activation=...,
     out_channels=...,
 )
 
 learning_rate = 1e-4
-# specify loss 
+# specify loss
 
 # specify optimizer
 
 # add training loop
-
 
 
 # %% tags=["solution"]
@@ -819,23 +837,23 @@ unet.eval()
 )
 for idx, (image, mask, _) in enumerate(tqdm(val_dataloader)):
     image = image.to(device)
-    
+
     pred = unet(image)
-    
+
     image = np.squeeze(image.cpu())
-    
+
     gt_labels = np.squeeze(mask.cpu().numpy())
-    
+
     pred = np.squeeze(pred.cpu().detach().numpy())
-    
+
     # feel free to try different thresholds
     thresh = threshold_otsu(pred)
-    
+
     # get boundary mask
     inner_mask = 0.5 * (pred[0] + pred[1]) > thresh
-    
+
     boundary_distances = distance_transform_edt(inner_mask)
-    
+
     pred_labels = watershed_from_boundary_distance(
         boundary_distances, inner_mask, id_offset=0, min_seed_distance=20
     )
@@ -852,7 +870,7 @@ print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
 # <hr style="height:2px;">
 #
 # ## Bonus: Further reading on Affinities
-# [Here](https://localshapedescriptors.github.io/) is a blog post describing the Local Shape Descriptor method of instance segmentation. 
+# [Here](https://localshapedescriptors.github.io/) is a blog post describing the Local Shape Descriptor method of instance segmentation.
 #
 # %% [markdown]
 # <hr style="height:2px;">
@@ -911,4 +929,3 @@ for idx, (image, mask, _) in enumerate(tqdm(val_loader)):
 print(f"Mean Precision is {np.mean(precision_list):.3f}")
 print(f"Mean Recall is {np.mean(recall_list):.3f}")
 print(f"Mean Accuracy is {np.mean(accuracy_list):.3f}")
-
