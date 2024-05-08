@@ -486,6 +486,8 @@ show_random_augmentation_comparison(train_data, example_augmented_data)
 # %% [markdown]
 # <div class="alert alert-block alert-info">
 #     <b>Task 2.1</b>: Now create an augmented dataset with an augmentation of your choice.
+#       **hint**: Using the same augmentation as was applied to the validation data will
+#      likely be optimal.
 # </div>
 
 # %%
@@ -497,7 +499,7 @@ augmented_data = NucleiDataset(
     transforms_v2.Compose(
         [transforms_v2.RandomRotation(45), transforms_v2.RandomCrop(256)]
     ),
-    img_transform=transforms_v2.Compose([transforms_v2.GaussianBlur(5, sigma=1.0)]),
+    img_transform=transforms_v2.Compose([transforms_v2.Lambda(salt_and_pepper_noise)]),
 )
 
 
