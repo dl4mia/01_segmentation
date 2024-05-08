@@ -56,12 +56,16 @@ from local import (
 )
 from unet import UNet
 
-# %%
-# Note: We are artificially making our validation data worse. This dataset
+# %% [markdown]
+
+# *Note*: We are artificially making our validation data worse. This dataset
 # was chosen to be reasonable to segment in the amount of time it takes to
 # run this exercise. However this means that some techniques like augmentations
 # aren't as useful as they would be on a more complex dataset. So we are
 # artificially adding noise to the validation data to make it more challenging.
+
+# %%
+
 def salt_and_pepper_noise(image, amount=0.05):
     """
     Add salt and pepper noise to an image
