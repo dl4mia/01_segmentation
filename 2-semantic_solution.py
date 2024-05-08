@@ -57,10 +57,45 @@ from local import (
 from unet import UNet
 
 # %%
+# Note: We are artificially making our validation data worse. This dataset
+# was chosen to be reasonable to segment in the amount of time it takes to
+# run this exercise. However this means that some techniques like augmentations
+# aren't as useful as they would be on a more complex dataset. So we are
+# artificially adding noise to the validation data to make it more challenging.
+def salt_and_pepper_noise(image, amount=0.05):
+    """
+    Add salt and pepper noise to an image
+    """
+    out = image.clone()
+    num_salt = int(amount * image.numel() * 0.5)
+    num_pepper = int(amount * image.numel() * 0.5)
+
+    # Add Salt noise
+    coords = [
+        torch.randint(0, i - 1, [num_salt]) if i > 1 else [0] * num_salt
+        for i in image.shape
+    ]
+    out[coords] = 1
+
+    # Add Pepper noise
+    coords = [
+        torch.randint(0, i - 1, [num_pepper]) if i > 1 else [0] * num_pepper
+        for i in image.shape
+    ]
+    out[coords] = 0
+
+    return out
+
+
+# %%
 
 train_data = NucleiDataset("nuclei_train_data", transforms_v2.RandomCrop(256))
 train_loader = DataLoader(train_data, batch_size=5, shuffle=True, num_workers=8)
-val_data = NucleiDataset("nuclei_val_data", transforms_v2.RandomCrop(256))
+val_data = NucleiDataset(
+    "nuclei_val_data",
+    transforms_v2.RandomCrop(256),
+    img_transform=transforms_v2.Lambda(salt_and_pepper_noise),
+)
 val_loader = DataLoader(val_data, batch_size=5)
 
 unet = UNet(depth=4, in_channels=1, out_channels=1, num_fmaps=2).to(device)
